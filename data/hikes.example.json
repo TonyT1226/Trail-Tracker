@@ -1,8 +1,8 @@
 {
   "app": "at-tracker",
-  "version": 1,
-  "hikes": [
-    { "id": "example-1", "date": "2026-05-03", "from": 0, "to": 31.7, "fromName": "Springer Mountain", "toName": "Neels Gap", "note": "第一天，下雨" },
-    { "id": "example-2", "date": "2026-05-04", "from": 31.7, "to": 52.4, "fromName": "", "toName": "", "note": "" }
+  "schemaVersion": 1,
+  "activities": [
+    { "id": "example-1", "trailId": "AT", "date": "2026-05-03", "source": "manual", "range": { "from": 0, "to": 31.7 }, "fromName": "Springer Mountain", "toName": "Neels Gap", "note": "Day one, rained most of the afternoon" },
+    { "id": "example-2", "trailId": "AT", "date": "2026-05-04", "source": "manual", "range": { "from": 31.7, "to": 52.4 }, "fromName": "", "toName": "", "note": "" }
   ]
 }

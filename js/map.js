@@ -7,7 +7,7 @@ const COLORS = { base: '#4f5d58', done: '#d1246b', halo: '#ffb703', casing: '#ff
 
 const widthByZoom = (small, large) => ['interpolate', ['linear'], ['zoom'], 4, small, 11, large];
 
-export function createMapView({ mapboxgl, token, style, route, anchors, bordersUrl, container, onPick, onError }) {
+export function createMapView({ mapboxgl, token, style, route, anchors, bordersUrl, container, onPick, onError, unit = 'mi', formatMile }) {
   mapboxgl.accessToken = token;
   const map = new mapboxgl.Map({
     container,
@@ -16,7 +16,7 @@ export function createMapView({ mapboxgl, token, style, route, anchors, bordersU
     fitBoundsOptions: { padding: 40 },
   });
   map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
-  map.addControl(new mapboxgl.ScaleControl({ unit: 'imperial' }), 'bottom-left');
+  map.addControl(new mapboxgl.ScaleControl({ unit: unit === 'km' ? 'metric' : 'imperial' }), 'bottom-left');
 
   let ready = false;
   let pendingDone = EMPTY;
@@ -120,7 +120,7 @@ export function createMapView({ mapboxgl, token, style, route, anchors, bordersU
     if (hit) {
       new mapboxgl.Popup({ closeButton: false, offset: 8 })
         .setLngLat(route.pointAt(mile))
-        .setText(`里程 ${mile.toFixed(1)}`)
+        .setText(formatMile ? formatMile(mile) : mile.toFixed(1))
         .addTo(map);
     }
   });

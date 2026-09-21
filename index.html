@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>AT 进度看板</title>
+  <title data-i18n="title">AT Progress Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
@@ -13,10 +13,10 @@
 <body>
   <div class="app">
     <main class="map-wrap">
-      <div id="map" role="application" aria-label="Appalachian Trail 地图"></div>
+      <div id="map" role="application" data-i18n-aria="mapAriaLabel" aria-label="Appalachian Trail map"></div>
       <div class="map-tools">
-        <button type="button" id="fitBtn">看全程</button>
-        <button type="button" id="terrainBtn" aria-pressed="false">3D 地形</button>
+        <button type="button" id="fitBtn" data-i18n="fitBtn">View full trail</button>
+        <button type="button" id="terrainBtn" aria-pressed="false" data-i18n="terrainBtn">3D terrain</button>
       </div>
       <p class="pick-hint" id="pickHint" hidden></p>
       <div class="map-msg" id="mapMsg" hidden></div>
@@ -24,66 +24,76 @@
 
     <aside class="panel">
       <header class="head">
-        <h1>Appalachian Trail</h1>
-        <p class="sub">乔治亚 Springer Mountain 到缅因 Mount Katahdin</p>
+        <div class="head-row">
+          <h1>Appalachian Trail</h1>
+          <div class="switches">
+            <div class="switch" id="langSwitch" role="group" data-i18n-aria="langToggleAria" aria-label="Language">
+              <button type="button" data-lang="en">EN</button>
+              <button type="button" data-lang="zh">中文</button>
+            </div>
+            <div class="switch" id="unitSwitch" role="group" data-i18n-aria="unitToggleAria" aria-label="Distance unit">
+              <button type="button" data-unit="mi">mi</button>
+              <button type="button" data-unit="km">km</button>
+            </div>
+          </div>
+        </div>
+        <p class="sub" data-i18n="subtitle">Springer Mountain, GA to Mount Katahdin, ME</p>
       </header>
 
-      <p class="banner" id="placeholderBanner" hidden>
-        现在显示的是占位路线：用直线连起大约 58 个航点，不是真实的 AT，里程也是估算。按 README 运行数据脚本后会换成真实路线。
-      </p>
+      <p class="banner" id="placeholderBanner" data-i18n="placeholderBanner" hidden></p>
       <p class="banner error" id="loadError" hidden></p>
 
-      <section class="progress" aria-label="总进度">
-        <div class="blazes" id="blazes" role="img" aria-label="已完成 0%"></div>
+      <section class="progress" data-i18n-aria="progressAriaLabel" aria-label="Overall progress">
+        <div class="blazes" id="blazes" role="img" aria-label="0% complete"></div>
         <p class="figures">
           <span class="big" id="doneMi">0.0</span>
-          <span class="of">/ <span id="totalMi">0</span> 英里</span>
+          <span class="of">/ <span id="totalMi">0</span></span>
           <span class="pct" id="pct">0.0%</span>
         </p>
         <dl class="facts">
-          <div><dt>剩余</dt><dd id="remainMi">—</dd></div>
-          <div><dt>徒步天数</dt><dd id="dayCount">—</dd></div>
-          <div><dt>记录</dt><dd id="hikeCount">—</dd></div>
-          <div><dt>最近一次</dt><dd id="lastDate">—</dd></div>
+          <div><dt data-i18n="remainingLabel">Remaining</dt><dd id="remainMi">—</dd></div>
+          <div><dt data-i18n="daysLabel">Days hiked</dt><dd id="dayCount">—</dd></div>
+          <div><dt data-i18n="hikesLabel">Hikes logged</dt><dd id="hikeCount">—</dd></div>
+          <div><dt data-i18n="lastLabel">Last hike</dt><dd id="lastDate">—</dd></div>
         </dl>
       </section>
 
       <section id="statesSection" aria-labelledby="statesTitle">
-        <h2 id="statesTitle">各州进度</h2>
+        <h2 id="statesTitle" data-i18n="statesTitle">Progress by state</h2>
         <ol class="states" id="states"></ol>
       </section>
 
       <section aria-labelledby="formTitle">
-        <h2 id="formTitle">记录一段徒步</h2>
+        <h2 id="formTitle" data-i18n="formTitle">Log a hike</h2>
         <form id="hikeForm" autocomplete="off" novalidate>
           <label class="field">
-            <span>完成日期</span>
+            <span data-i18n="dateLabel">Date</span>
             <input type="date" id="fDate" required>
           </label>
           <div class="pair">
             <label class="field">
-              <span>起点</span>
+              <span data-i18n="startLabel">Start</span>
               <span class="inline">
-                <input id="fFrom" list="anchorList" placeholder="里程或地名" required>
-                <button type="button" class="pick" data-target="fFrom" aria-label="在地图上选起点">选点</button>
+                <input id="fFrom" list="anchorList" placeholder="Mile or place name" data-i18n-placeholder="mileOrName" required>
+                <button type="button" class="pick" data-target="fFrom" data-i18n-aria="pickStartAria" aria-label="Pick start on the map" data-i18n="pickBtn">Pick</button>
               </span>
             </label>
             <label class="field">
-              <span>终点</span>
+              <span data-i18n="endLabel">End</span>
               <span class="inline">
-                <input id="fTo" list="anchorList" placeholder="里程或地名" required>
-                <button type="button" class="pick" data-target="fTo" aria-label="在地图上选终点">选点</button>
+                <input id="fTo" list="anchorList" placeholder="Mile or place name" data-i18n-placeholder="mileOrName" required>
+                <button type="button" class="pick" data-target="fTo" data-i18n-aria="pickEndAria" aria-label="Pick end on the map" data-i18n="pickBtn">Pick</button>
               </span>
             </label>
           </div>
           <p class="preview" id="preview" aria-live="polite"></p>
           <label class="field">
-            <span>备注</span>
-            <input id="fNote" placeholder="天气、同行的人、住在哪">
+            <span data-i18n="noteLabel">Note</span>
+            <input id="fNote" placeholder="Weather, who you went with, where you stayed" data-i18n-placeholder="notePlaceholder">
           </label>
           <div class="actions">
-            <button type="submit" id="submitBtn" class="primary">记录这段</button>
-            <button type="button" id="cancelEdit" class="ghost" hidden>取消编辑</button>
+            <button type="submit" id="submitBtn" class="primary" data-i18n="submitBtn">Log this hike</button>
+            <button type="button" id="cancelEdit" class="ghost" hidden data-i18n="cancelEditBtn">Cancel edit</button>
           </div>
           <p class="msg" id="formMsg" aria-live="polite"></p>
           <datalist id="anchorList"></datalist>
@@ -91,17 +101,17 @@
       </section>
 
       <section aria-labelledby="hikesTitle">
-        <h2 id="hikesTitle">徒步记录</h2>
+        <h2 id="hikesTitle" data-i18n="hikesTitle">Hike log</h2>
         <ol class="hikes" id="hikes"></ol>
-        <p class="empty" id="emptyMsg">还没有记录。填一段上面的表单，或者点“选点”在地图上选起点和终点。</p>
+        <p class="empty" id="emptyMsg" data-i18n="emptyMsg">No hikes logged yet. Fill in the form above, or click "Pick" to choose a start and end point on the map.</p>
       </section>
 
       <footer class="foot">
         <div class="tools">
-          <button type="button" class="ghost" id="exportBtn">导出 JSON</button>
-          <label class="ghost btn">导入 JSON<input type="file" id="importFile" accept="application/json,.json" hidden></label>
+          <button type="button" class="ghost" id="exportBtn" data-i18n="exportBtn">Export JSON</button>
+          <label class="ghost btn"><span data-i18n="importBtn">Import JSON</span><input type="file" id="importFile" accept="application/json,.json" hidden></label>
         </div>
-        <p class="credit">记录只保存在这个浏览器里，换设备前先导出。路线：美国国家公园管理局 Appalachian Trail Park Office 与 Appalachian Trail Conservancy。地名：© OpenStreetMap 贡献者。</p>
+        <p class="credit" id="credit" data-i18n="creditText">Hikes are only saved in this browser -- export a backup before switching devices. Trail: National Park Service Appalachian Trail Park Office &amp; Appalachian Trail Conservancy. Place names: © OpenStreetMap contributors.</p>
       </footer>
     </aside>
   </div>

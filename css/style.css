@@ -60,11 +60,25 @@ body {
 
 /* ---------------------------------------------------------------- type */
 
+.head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+
 h1 {
   margin: 0;
   font: 700 34px/1 var(--font-display);
   letter-spacing: 0.01em;
 }
+
+.switches { display: flex; gap: 6px; flex: none; }
+.switch { display: flex; border: 1px solid var(--pine-line); border-radius: 6px; overflow: hidden; }
+.switch button {
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--moss);
+  background: transparent;
+  border: 0;
+}
+.switch button.active { color: var(--ink); background: var(--blaze); }
 h2 {
   margin: 30px 0 10px;
   font: 600 20px/1.2 var(--font-display);
@@ -107,7 +121,7 @@ h2 {
 .state { padding: 7px 0; }
 .state-head { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
 .state-num { color: var(--moss); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.state.complete .state-name::after { content: " 已走完"; color: var(--moss); font-size: 12px; }
+.state-done-badge { margin-left: 6px; color: var(--moss); font-size: 12px; }
 .track { height: 5px; margin-top: 5px; overflow: hidden; background: rgba(246, 247, 242, 0.14); border-radius: 3px; }
 .fill { display: block; height: 100%; background: var(--magenta); border-radius: 3px; }
 
@@ -240,7 +254,7 @@ button:focus-visible, input:focus-visible, .btn:focus-within {
 .map-msg .inline { width: min(420px, 100%); }
 .map-note { color: var(--moss); font-size: 13px; }
 
-/* Mapbox's own popup (the "里程 X.X" bubble when you click the trail) has a white
+/* Mapbox's own popup (the "Mile X.X" bubble when you click the trail) has a white
    background but doesn't set its own text color, so it was inheriting the page's
    light body text -- white on white. Force dark text to match the white bubble. */
 .mapboxgl-popup-content { color: var(--ink); }

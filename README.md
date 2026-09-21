@@ -1,104 +1,110 @@
-# AT 进度看板
+# AT Progress Tracker
 
-记录你走过的 Appalachian Trail 里程，在地图上把走完的部分标成洋红色，并按州统计进度。纯静态网站，部署在 GitHub Pages，不需要后端，也不需要构建步骤。代码遵循 [MIT 协议](LICENSE)；步道路线数据另有出处和许可，见「数据来源与许可」一节。
+*(中文说明见 [README.zh.md](README.zh.md))*
 
-## 整体结构
+Log the Appalachian Trail miles you've hiked, see the finished sections highlighted in magenta on a map, and track progress by state. A static site, deployable to GitHub Pages, no backend and no build step. Code is [MIT licensed](LICENSE); the trail data has its own sources and licenses -- see "Data sources and licensing" below.
+
+The UI defaults to English with a language switch (EN / 中文) and a distance-unit switch (mi / km) in the header; your choice is remembered in this browser.
+
+## Layout
 
 ```
-index.html            页面骨架
-start.command         双击启动本地服务器并打开浏览器
-css/style.css         样式（松绿面板 + 白色路标 + 洋红完成线）
+index.html            page shell
+start.command         double-click to start a local server and open the browser
+css/style.css         styling (pine-green panel + white blazes + magenta completed line)
 js/
-  config.js           你要改的设置：Mapbox token、州合并规则、数据路径
-  app.js              页面逻辑：读数据、表单、记录列表、统计
-  map.js              所有 Mapbox 代码都在这里（底图、路线、地名、州界、3D 地形、点选里程）
-  geo.js              路线几何：按里程取点/切段、找离点击处最近的里程
-  intervals.js        里程区间合并（重复、重叠的徒步不会重复计算）
-  store.js            徒步记录的存取，浏览器 localStorage + 导入导出 JSON
-  stats.js            总进度和各州进度
+  config.js           settings you may want to change: Mapbox token, state grouping, data paths
+  strings.js           all user-facing text, English + Chinese, plus the language/unit switches
+  app.js               page logic: load data, the form, the hike log, stats
+  map.js               all the Mapbox code lives here (basemap, route, place names, state borders, 3D terrain, click-to-pick)
+  geo.js               route geometry: point/slice by mile, nearest mile to a click
+  intervals.js         mile-range merging (a repeated or overlapping hike is never double-counted)
+  store.js             the hike log's storage: localStorage + JSON export/import
+  stats.js             overall and per-state progress
 data/
-  route.json          路线：坐标 + 每个点的里程
-  anchors.json        地名（村镇、垭口、庇护所）及其里程
-  states.json         每个州对应的里程区间
-  state_borders.geojson  州界虚线（可选）
-scripts/              数据流水线（Python），生成上面 data/ 里的文件
-tests/                JS 与 Python 测试
+  route.json           the route: coordinates + the mile at each point
+  anchors.json         named places (towns, gaps, shelters) and their mile
+  states.json          the mile range(s) each state covers
+  state_borders.geojson  dashed state-border lines (optional)
+scripts/               the data pipeline (Python) that generates the files in data/
+tests/                JS and Python tests
 ```
 
-## 数据模型
+## Data model
 
-一次徒步是一个里程区间：`{ date, from, to, fromName, toName, note }`。已完成的路线是所有区间的并集，所以同一段走两遍、或者两次徒步有重叠，都只算一次。`from > to` 表示南行，统计时按同一段处理。
+A hike is logged as one Activity: `{ id, trailId, date, source, range: { from, to }, fromName, toName, note }` (`range` is in miles as walked, so `from > to` means southbound; `source` is `'manual'` for everything you log by hand today -- reserved for `'gpx'`/`'healthkit'` once later milestones add other ways to bring in a hike). The finished trail is the union of every activity's range, so walking the same stretch twice, or two hikes that overlap, are each only counted once.
 
-路线数据的关键设计：`route.json` 里每个顶点都带里程，地图上“从第 A 英里到第 B 英里”只是查表，不需要在浏览器里做地理计算。地名和州界都通过同一条路线换算成里程，所以三者天然对得上。
+There is exactly one JSON shape to reason about, and it's a single continuously-updated record, not one file per hike: activities live in this browser's localStorage as one evolving list; "Export JSON" always writes out a complete snapshot of everything logged so far (not just what's new); "Import JSON" merges a snapshot back in by id (an incoming entry with the same id overwrites the local one). So re-exporting after every hike, or importing an old backup on top of a newer log, are both safe and never lose or duplicate data.
 
-## 数据流水线
+Why the route data matters here: every vertex in `route.json` already carries its mile, so "from mile A to mile B" on the map is a lookup, not a geometry calculation done in the browser. Place names and state boundaries are both expressed in miles along that same route, so all three line up automatically.
+
+## Data pipeline
 
 ```
-fetch_centerline.py   ->  data/raw/centerline.geojson          NPS/ATC 官方中心线（~3000 段独立测量的线）
-order_centerline.py   ->  data/raw/centerline_ordered.geojson  按南到北顺序拼接成一条线（见下）
-build_route.py        ->  data/route.json                      定向、按官方总长换算里程、简化
-fetch_osm_pois.py     ->  data/raw/osm_pois.geojson            OpenStreetMap 的庇护所/垭口/村镇
-build_anchors.py      ->  data/anchors.json                    吸附到路线上，得到里程
-(下载 Census 州界)    ->  data/raw/cb_2023_us_state_500k.zip
+fetch_centerline.py   ->  data/raw/centerline.geojson          the official NPS/ATC centerline (~3,000 independently surveyed segments)
+order_centerline.py   ->  data/raw/centerline_ordered.geojson  stitched into one south-to-north line (see below)
+build_route.py        ->  data/route.json                      oriented, mile-scaled to the official length, simplified
+fetch_osm_pois.py     ->  data/raw/osm_pois.geojson             shelters/gaps/towns from OpenStreetMap
+build_anchors.py      ->  data/anchors.json                    snapped onto the route, giving each one a mile
+(download Census state boundaries) -> data/raw/cb_2023_us_state_500k.zip
 build_states.py       ->  data/states.json, data/state_borders.geojson
-make_placeholder.py   ->  占位数据（直线连接约 58 个航点，仅供试用）
+make_placeholder.py   ->  placeholder data (about 58 waypoints connected by straight lines, for trying the app out only)
 ```
 
-官方总长默认 2197.9 英里（ATC 2026 年数据），可用 `--official-miles` 修改。几何长度与官方长度的比例用来缩放里程；如果你手上有可靠的里程标记，可以用 `--calibration` 传入分段校准。
+The official length defaults to 2,197.9 miles (ATC's 2026 figure); override with `--official-miles`. The ratio between the geometric length and the official length is used to scale the mile markers; pass `--calibration` with per-segment calibration points if you have reliable mile markers of your own.
 
-**为什么多了 `order_centerline.py` 这一步：** NPS 的 ANST_Centerline 图层不是一条排好序的线，而是 20 多年里不同年份、不同 GPS 设备测量的近 3000 段独立线段，段与段之间经常有几米到几十米的空隙（不是精确首尾相连）。早期直接把这些段丢给 `build_route.py` 自带的"贪心找最近点拼接"逻辑，会被这些空隙和个别测量伪迹（比如重复记录的单点、和主线无关的小连接段）带偏，拼出一条长达 3049 英里、结尾在离 Katahdin 890 英里外的错误路线。`order_centerline.py` 用更稳的办法解决：先按官方 `Alt_Name` 字段剔除 Bartram Trail、Benton MacKaye Trail 这类共线的旁道；再用模糊匹配（容差约 80 米）把本该相连但有小空隙的线段拼起来，比 shapely 的精确端点匹配更宽容；最后按 Springer→Katahdin 方向做全局排序拼接，丢弃拼接产生的孤立伪迹点。目前跑出来的结果：拼接后总长 2158 英里，起点离 Springer 0.01 英里、终点离 Katahdin 0.01 英里以内，连接处最大空隙 2.5 英里（真实存在、未被测量覆盖的路段，比如公路穿越点）。
+**Why there's an extra `order_centerline.py` step:** the NPS's ANST_Centerline layer isn't one ordered line -- it's nearly 3,000 independently surveyed segments from more than 20 years of different equipment and different years, often with gaps of a few meters to a few dozen meters between segments that should connect (not exact endpoint matches). Feeding these straight into `build_route.py`'s own greedy nearest-point stitching used to get thrown off by those gaps and by a handful of survey artifacts (duplicated single points, short connector segments unrelated to the main line), producing a broken 3,049-mile route that ended 890 miles short of Katahdin. `order_centerline.py` takes a more robust approach: it first drops co-located alternates like the Bartram Trail and Benton MacKaye Trail using the official `Alt_Name` field; then stitches segments that should connect but have small gaps using fuzzy matching (about 80m tolerance), which is more forgiving than shapely's exact-endpoint matching; then does one global sort-and-stitch pass in the Springer-to-Katahdin direction, discarding the isolated artifact points that stitching produces. Current result: a stitched line 2,158 miles long, starting within 0.01 miles of Springer and ending within 0.01 miles of Katahdin, with the largest gap at any single join being 2.5 miles (a real, unsurveyed stretch -- a road crossing, for instance).
 
-### 常用命令
+### Common commands
 
 ```bash
 pip install shapely numpy pyshp
 
 python3 scripts/fetch_centerline.py
-python3 scripts/order_centerline.py data/raw/centerline.geojson        # 拼接成一条有序的线
-python3 scripts/build_route.py data/raw/centerline_ordered.geojson --inspect   # 先看看数据长什么样
+python3 scripts/order_centerline.py data/raw/centerline.geojson        # stitch into one ordered line
+python3 scripts/build_route.py data/raw/centerline_ordered.geojson --inspect   # take a look at the data first
 python3 scripts/build_route.py data/raw/centerline_ordered.geojson -o data/route.json
 
 python3 scripts/fetch_osm_pois.py
 python3 scripts/build_anchors.py data/raw/osm_pois.geojson
 
-# 下载 https://www2.census.gov/geo/tiger/GENZ2023/shp/cb_2023_us_state_500k.zip 到 data/raw/
+# download https://www2.census.gov/geo/tiger/GENZ2023/shp/cb_2023_us_state_500k.zip into data/raw/
 python3 scripts/build_states.py data/raw/cb_2023_us_state_500k.zip --min-run 0.8
 ```
 
-`build_route.py` 会检查路线是否从 Springer Mountain 出发、到 Katahdin 结束，并报告拼接时的缺口和长度偏差。看到 WARNING 先别忽略——不过用了 `order_centerline.py` 之后应该不会再有这些警告了。
+`build_route.py` checks that the route starts at Springer Mountain and ends at Katahdin, and reports any gaps and length deviation from stitching. Don't ignore a WARNING here -- though you shouldn't see any once you're using `order_centerline.py`.
 
-`fetch_osm_pois.py` 用的是公共 Overpass API，请求多了会被限流（HTTP 429）。如果整条命令跑到一半失败，直接重新运行 `fetch_osm_pois.py` 即可（默认按 40 英里分段请求，重试很快）；网络不稳定时可以加 `--chunk-miles` 调大分段、减少请求次数。
+`fetch_osm_pois.py` uses the public Overpass API, which rate-limits you (HTTP 429) if you ask for too much at once. If the command fails partway through, just re-run `fetch_osm_pois.py` -- it requests in 40-mile chunks by default, so retries are quick; on a flaky connection, pass `--chunk-miles` with a larger value to make fewer, bigger requests.
 
-`build_states.py` 的 `--min-run` 控制"州界噪音"的平滑程度：AT 沿北卡/田纳西州界来回穿插约 200 英里、沿弗吉尼亚/西弗吉尼亚州界也有类似路段，默认 0.1 英里的平滑力度会在这些地方切出上百个碎片区间；调到 0.8 英里左右能把弗吉尼亚/西弗吉尼亚收敛到几段真实的跨州（在 Harpers Ferry 附近），北卡/田纳西那 200 英里本来就是真实的反复穿插，切多细都不算错——不管切成多少段，`js/stats.js` 都会把同一个州的里程加总成一个数字，不影响显示。
+`build_states.py`'s `--min-run` controls how aggressively "state-border noise" gets smoothed out: the AT zig-zags across the NC/TN state line for about 200 miles, and across the VA/WV line for a shorter stretch, and the default 0.1-mile smoothing would carve those into hundreds of tiny fragments; raising it to about 0.8 miles collapses VA/WV down to a few real crossings (near Harpers Ferry), and the ~200 miles of genuine NC/TN back-and-forth is real regardless of how finely it gets sliced -- however many segments it ends up as, `js/stats.js` just sums them into one number per state, so it doesn't affect what's displayed.
 
-### 关于州界处的统计
+### On the state-line statistics
 
-北卡和田纳西之间约 200 英里，路线沿着州界来回穿插，弗吉尼亚和西弗吉尼亚之间也有类似的地方。这些地方按多边形划分会产生很多小段（NC、TN 各有十几段），但各州进度列表只看总里程，段数不影响统计结果，所以默认按 14 个州分别显示。如果想把某几个州合并成一行，在 `js/config.js` 的 `stateGroups` 里加，例如 `[['NC', 'TN']]`。
+The AT runs along the NC/TN state line, crossing back and forth, for about 200 miles; there's a shorter stretch like that on the VA/WV line too. Splitting these by polygon produces a lot of short segments (NC and TN each end up with over a dozen), but the per-state progress list only cares about total miles -- the segment count doesn't affect the result -- so all 14 states are shown separately by default. If you'd rather show a couple of states as one row, add them to `stateGroups` in `js/config.js`, e.g. `[['NC', 'TN']]`.
 
-## 数据来源与许可
+## Data sources and licensing
 
-- **步道中心线**（`data/route.json` 的原始输入）：National Park Service Appalachian National Scenic Trail 与 Appalachian Trail Conservancy 联合维护的 `ANST_Centerline` 图层（ArcGIS Online 公开图层）。图层自带的版权声明是 `National Park Service Appalachian National Scenic Trail & Appalachian Trail Conservancy, 2023`，附带的说明是"仅供一般参考、不是法律文件，NPS / USDA Forest Service / ATC 及合作方不对准确性、可靠性或完整性做任何明示或暗示的保证"——这是免责声明，不是一份正式的可复用许可（既没写公有领域，也没写具体的转载条款）。因为版权方里包含 ATC 这个非营利机构（不是纯联邦政府作品），不能简单当作 public domain。本项目按上面那行原文署名使用；如果你打算更大范围地重新分发这份几何数据，建议自己联系 ATC 确认。
-- **官方总里程**（默认 2197.9 英里）：ATC 每年发布的官方数据，当前用的是 2026 年的数字，见 `build_route.py --official-miles`。
-- **地名兴趣点**（`data/anchors.json` 的庇护所、垭口、村镇）：来自 OpenStreetMap，遵循 [ODbL](https://opendatacommons.org/licenses/odbl/) 协议，使用需署名 "© OpenStreetMap contributors"。
-- **州界**（`data/states.json`、`data/state_borders.geojson`）：美国人口普查局（Census Bureau）Cartographic Boundary File，属美国联邦政府作品，公有领域（Public Domain），没有版权限制。
-- **地图底图**：Mapbox（`mapStyle` 见 `js/config.js`），页面右下角会自动显示 Mapbox 和 OpenStreetMap 的署名，遵循 Mapbox 自己的服务条款。
+- **Trail centerline** (the raw input to `data/route.json`): the `ANST_Centerline` layer maintained jointly by the National Park Service's Appalachian National Scenic Trail office and the Appalachian Trail Conservancy (a public ArcGIS Online layer). Its own copyright text reads `National Park Service Appalachian National Scenic Trail & Appalachian Trail Conservancy, 2023`, with a note that the data is "for general reference purposes only... not legal documents," with no warranty as to accuracy, reliability, or completeness from NPS, USDA Forest Service, ATC, or their partners -- that's a liability disclaimer, not a formal reuse license (it states neither public domain nor specific redistribution terms). Because the copyright is jointly held with ATC, a private nonprofit (not a pure federal work), it can't simply be treated as public domain. This project attributes it using the line above; if you plan to redistribute this geometry more broadly, check with ATC directly.
+- **Official trail length** (defaults to 2,197.9 miles): ATC's annually published figure; currently using the 2026 number -- see `build_route.py --official-miles`.
+- **Named points of interest** (the shelters, gaps, and towns in `data/anchors.json`): from OpenStreetMap, under the [ODbL](https://opendatacommons.org/licenses/odbl/) license, requiring attribution to "© OpenStreetMap contributors".
+- **State boundaries** (`data/states.json`, `data/state_borders.geojson`): the US Census Bureau's Cartographic Boundary File, a US federal government work, in the public domain with no copyright restriction.
+- **Basemap**: Mapbox (`mapStyle` in `js/config.js`); the page automatically shows Mapbox's and OpenStreetMap's attribution in the bottom-right corner, per Mapbox's own terms of service.
 
-## 本地运行与测试
+## Running and testing locally
 
-双击 [`start.command`](start.command) 会自动启动本地服务器并打开浏览器（第一次运行 macOS 可能提示"来自未标识开发者"，去系统设置里点"仍要打开"）。或者手动：
+Double-click [`start.command`](start.command) to start a local server and open the browser automatically (the first time, macOS may warn that it's "from an unidentified developer" -- go to System Settings and click "Open Anyway"). Or do it by hand:
 
 ```bash
-python3 -m http.server 8000     # 然后访问 http://localhost:8000（不能直接双击 index.html）
-npm install                     # 只为跑 UI 测试
-npm test                        # JS 测试
-python3 -m unittest tests/test_pipeline.py -v   # 数据流水线测试
+python3 -m http.server 8000     # then visit http://localhost:8000 (double-clicking index.html directly won't work)
+npm install                     # only needed to run the UI tests
+npm test                        # JS tests
+python3 -m unittest tests/test_pipeline.py -v   # data pipeline tests
 ```
 
-## 部署
+## Deployment
 
-推到 GitHub，Settings → Pages → Deploy from a branch → `main` / root。`js/config.js` 里的 `mapboxToken` 留空，不要提交自己的令牌；第一次打开页面时会弹出输入框，令牌只存在浏览器的 localStorage 里。如果想长期用同一个令牌不用每次输入，可以在 Mapbox 后台创建一个 public token 并限制到自己的 Pages 网址（例如 `https://用户名.github.io`）加 `http://localhost:8000`，再自行写入本地的 `js/config.js`（该文件已跟踪进仓库，写入后注意不要提交）。
+Push to GitHub, then Settings → Pages → Deploy from a branch → `main` / root. Leave `mapboxToken` empty in `js/config.js` -- don't commit your own token; the page will prompt for one on first load, and it's kept in that browser's localStorage only. If you'd rather not re-enter it every time, create a public token in the Mapbox dashboard restricted to your own Pages URL (e.g. `https://yourname.github.io`) plus `http://localhost:8000`, and write it into your own local copy of `js/config.js` (that file is tracked in the repo, so be careful not to commit it once you've added a real token).
 
-## 备份
+## Backups
 
-徒步记录存在浏览器的 localStorage 里。页面底部有“导出 JSON”，换设备或清理浏览器数据之前先导出。也可以把导出的文件放到 `data/hikes.json`，新浏览器第一次打开时会用它作为初始记录。
-
+Hikes are saved in this browser's localStorage. There's an "Export JSON" button at the bottom of the page -- use it before switching devices or clearing browser data. You can also drop an exported file at `data/hikes.json`; a browser that has never saved anything locally will use it to seed the initial log.

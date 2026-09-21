@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { stateProgress, summarize } from '../js/stats.js';
 import { merge } from '../js/intervals.js';
 
-const hike = (from, to, date = '2026-05-01') => ({ id: `${from}-${to}`, date, from, to });
+const hike = (from, to, date = '2026-05-01') => ({ id: `${from}-${to}`, date, range: { from, to } });
 
 test('summarize merges overlaps and counts distinct days', () => {
   const s = summarize([hike(0, 30, '2026-05-01'), hike(20, 50, '2026-05-02'), hike(60, 70, '2026-05-02')], 100);

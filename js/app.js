@@ -4,11 +4,17 @@ import { merge, total } from './intervals.js';
 import * as store from './store.js';
 import { stateProgress, summarize } from './stats.js';
 import { createMapView } from './map.js';
-import { STATE_NAMES } from './strings.js';
+import { t, getLang, setLang, getUnit, setUnit, KM_PER_MI, STATE_NAMES } from './strings.js';
 
 const TOKEN_KEY = 'at-tracker:token';
 const $ = (sel) => document.querySelector(sel);
 const fmt = (n, d = 1) => Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+// Distances are stored and computed internally in miles throughout (that's what the AT data
+// pipeline stamps every route/anchor/state file with). The km/mi switch only affects display:
+// convert-and-label here, nowhere else.
+const distValue = (miles) => (getUnit() === 'km' ? miles * KM_PER_MI : miles);
+const dist = (miles) => `${fmt(distValue(miles))} ${t(getUnit() === 'km' ? 'unitKm' : 'unitMi')}`;
 
 const app = {
   route: null,
@@ -44,7 +50,7 @@ async function getJSON(url, optional = false) {
   const res = await fetch(url);
   if (!res.ok) {
     if (optional) return null;
-    throw new Error(`${url} 加载失败（HTTP ${res.status}）`);
+    throw new Error(t('loadFailed', url, res.status));
   }
   return res.json();
 }
@@ -58,6 +64,40 @@ function flash(message, isError = false) {
   if (!isError && message) flashTimer = setTimeout(() => { box.textContent = ''; }, 4000);
 }
 
+// ---------------------------------------------------------------- language / units
+
+function applyStaticI18n() {
+  document.documentElement.lang = getLang();
+  document.querySelectorAll('[data-i18n]').forEach((node) => { node.textContent = t(node.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((node) => {
+    node.placeholder = t(node.dataset.i18nPlaceholder);
+  });
+  document.querySelectorAll('[data-i18n-aria]').forEach((node) => {
+    node.setAttribute('aria-label', t(node.dataset.i18nAria));
+  });
+  document.querySelectorAll('#langSwitch button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.lang === getLang());
+  });
+  document.querySelectorAll('#unitSwitch button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.unit === getUnit());
+  });
+}
+
+function wireSwitches() {
+  $('#langSwitch').addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-lang]');
+    if (!btn || btn.dataset.lang === getLang()) return;
+    setLang(btn.dataset.lang);
+    location.reload();
+  });
+  $('#unitSwitch').addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-unit]');
+    if (!btn || btn.dataset.unit === getUnit()) return;
+    setUnit(btn.dataset.unit);
+    location.reload();
+  });
+}
+
 // ---------------------------------------------------------------- resolving what the user typed
 
 function anchorNear(mile, tolerance = 0.06) {
@@ -66,31 +106,31 @@ function anchorNear(mile, tolerance = 0.06) {
 
 // "31.7", "Neels Gap", or "Neels Gap (31.7)" -> { mile, name }
 function resolvePoint(text) {
-  const t = text.trim();
-  if (!t) throw new Error('请填写起点和终点');
+  const t2 = text.trim();
+  if (!t2) throw new Error(t('fillStartEnd'));
   let result;
-  if (/^\d+(\.\d+)?$/.test(t)) {
-    const mile = Number(t);
+  if (/^\d+(\.\d+)?$/.test(t2)) {
+    const mile = Number(t2);
     result = { mile, name: anchorNear(mile, 0.05)?.name ?? '' };
   } else {
-    const withMile = t.match(/^(.*?)\s*\((\d+(?:\.\d+)?)\)\s*$/);
+    const withMile = t2.match(/^(.*?)\s*\((\d+(?:\.\d+)?)\)\s*$/);
     if (withMile) {
       const name = withMile[1].trim();
       const typed = Number(withMile[2]);
       const hit = app.anchors.find((a) => a.name.toLowerCase() === name.toLowerCase() && Math.abs(a.mile - typed) < 0.06);
       result = { mile: hit ? hit.mile : typed, name };
     } else {
-      const key = t.toLowerCase();
+      const key = t2.toLowerCase();
       const exact = app.anchors.filter((a) => a.name.toLowerCase() === key);
       const starts = exact.length ? exact : app.anchors.filter((a) => a.name.toLowerCase().startsWith(key));
-      if (starts.length > 1) throw new Error(`有 ${starts.length} 个地点匹配“${t}”，请从下拉列表里选，或直接输入里程`);
-      if (!starts.length) throw new Error(`找不到“${t}”。可以输入里程数，或从下拉列表里选地名`);
+      if (starts.length > 1) throw new Error(t('multipleMatches', starts.length, t2));
+      if (!starts.length) throw new Error(t('noMatch', t2));
       result = { mile: starts[0].mile, name: starts[0].name };
     }
   }
   const max = app.route.length;
   if (result.mile < 0 || result.mile > max + 0.05) {
-    throw new Error(`里程 ${fmt(result.mile)} 超出范围（0 到 ${fmt(max)}）`);
+    throw new Error(t('outOfRange', fmt(distValue(result.mile)), fmt(distValue(max))));
   }
   result.mile = Math.min(result.mile, max);
   return result;
@@ -115,17 +155,19 @@ function renderStates(merged) {
     section.hidden = true;
     return;
   }
+  const names = STATE_NAMES[getLang()];
   const list = $('#states');
   list.replaceChildren();
   for (const r of stateProgress(merged, app.statesData, CONFIG.stateGroups)) {
-    const name = r.codes.map((c) => STATE_NAMES[c] || c).join(' / ');
+    const name = r.codes.map((c) => names[c] || c).join(' / ');
     const fill = el('span', { class: 'fill' });
     fill.style.width = `${r.pct}%`;
+    const done = r.pct >= 99.95;
     list.append(
-      el('li', { class: `state${r.pct >= 99.95 ? ' complete' : ''}` },
+      el('li', { class: `state${done ? ' complete' : ''}` },
         el('div', { class: 'state-head' },
-          el('span', { class: 'state-name', text: name }),
-          el('span', { class: 'state-num', text: `${fmt(r.done)} / ${fmt(r.total)}` })),
+          el('span', { class: 'state-name', text: name }, done ? el('span', { class: 'state-done-badge', text: t('stateCompleted') }) : null),
+          el('span', { class: 'state-num', text: `${fmt(distValue(r.done))} / ${fmt(distValue(r.total))}` })),
         el('div', {
           class: 'track', role: 'progressbar', 'aria-label': name,
           'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(r.pct)),
@@ -140,22 +182,22 @@ function hikeRow(h) {
   return el('li', { class: 'hike', 'data-id': h.id },
     el('time', { dateTime: h.date, text: h.date }),
     el('div', { class: 'hike-main' },
-      el('span', { class: 'hike-names', text: `${h.fromName || fmt(h.from)} → ${h.toName || fmt(h.to)}` }),
-      el('span', { class: 'hike-len', text: `${fmt(hi - lo)} 英里` })),
+      el('span', { class: 'hike-names', text: `${h.fromName || fmt(distValue(h.range.from))} → ${h.toName || fmt(distValue(h.range.to))}` }),
+      el('span', { class: 'hike-len', text: dist(hi - lo) })),
     h.note ? el('p', { class: 'hike-note', text: h.note }) : null,
-    el('div', { class: 'hike-actions' }, btn('定位', 'focus'), btn('编辑', 'edit'), btn('删除', 'del')));
+    el('div', { class: 'hike-actions' }, btn(t('focusBtn'), 'focus'), btn(t('editBtn'), 'edit'), btn(t('delBtn'), 'del')));
 }
 
 function render() {
   const s = summarize(app.hikes, app.route.length);
-  $('#doneMi').textContent = fmt(s.done);
+  $('#doneMi').textContent = fmt(distValue(s.done));
   $('#pct').textContent = `${fmt(s.pct)}%`;
-  $('#remainMi').textContent = `${fmt(s.remaining)} 英里`;
-  $('#dayCount').textContent = `${s.dayCount} 天`;
-  $('#hikeCount').textContent = `${s.hikeCount} 段`;
+  $('#remainMi').textContent = dist(s.remaining);
+  $('#dayCount').textContent = t('days', s.dayCount);
+  $('#hikeCount').textContent = t('hikesCount', s.hikeCount);
   $('#lastDate').textContent = s.lastDate ?? '—';
   renderBlazes(s.pct);
-  $('#blazes').setAttribute('aria-label', `已完成 ${fmt(s.pct)}%`);
+  $('#blazes').setAttribute('aria-label', t('completedAriaLabel', fmt(s.pct)));
   renderStates(s.merged);
 
   const sorted = [...app.hikes].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
@@ -180,7 +222,7 @@ function updatePreview() {
     const after = total(merge([...others, [Math.min(a.mile, b.mile), Math.max(a.mile, b.mile)]]));
     const fresh = after - before;
     const dup = len - fresh;
-    box.textContent = `${fmt(len)} 英里，新增 ${fmt(fresh)} 英里${dup > 0.05 ? `（${fmt(dup)} 英里之前走过，不重复计算）` : ''}`;
+    box.textContent = t('previewMsg', dist(len), dist(fresh), dup > 0.05 ? dist(dup) : null);
   } catch {
     /* incomplete input while typing: say nothing until submit */
   }
@@ -193,7 +235,7 @@ function commit(hikes) {
   try {
     store.save(hikes);
   } catch {
-    flash('浏览器不允许保存数据（可能是无痕模式）。请先点“导出 JSON”备份。', true);
+    flash(t('saveFailedPrivateMode'), true);
   }
   render();
 }
@@ -203,8 +245,8 @@ function resetForm() {
   $('#fFrom').value = '';
   $('#fTo').value = '';
   $('#fNote').value = '';
-  $('#formTitle').textContent = '记录一段徒步';
-  $('#submitBtn').textContent = '记录这段';
+  $('#formTitle').textContent = t('formTitle');
+  $('#submitBtn').textContent = t('submitBtn');
   $('#cancelEdit').hidden = true;
   $('#preview').textContent = '';
   endPick();
@@ -215,12 +257,11 @@ function submitForm(ev) {
   try {
     const a = resolvePoint($('#fFrom').value);
     const b = resolvePoint($('#fTo').value);
-    if (Math.abs(a.mile - b.mile) < 0.05) throw new Error('起点和终点几乎在同一处');
-    const hike = store.normalizeHike({
+    if (Math.abs(a.mile - b.mile) < 0.05) throw new Error(t('sameSpot'));
+    const hike = store.normalizeActivity({
       id: app.editingId || undefined,
       date: $('#fDate').value,
-      from: a.mile,
-      to: b.mile,
+      range: { from: a.mile, to: b.mile },
       fromName: a.name,
       toName: b.name,
       note: $('#fNote').value.trim(),
@@ -229,7 +270,7 @@ function submitForm(ev) {
     commit(editing ? app.hikes.map((h) => (h.id === hike.id ? hike : h)) : [...app.hikes, hike]);
     const [lo, hi] = store.bounds(hike);
     resetForm();
-    flash(editing ? '已保存修改' : `已记录 ${fmt(hi - lo)} 英里`);
+    flash(editing ? t('savedEdit') : t('logged', dist(hi - lo)));
     app.view?.focus(lo, hi);
   } catch (e) {
     flash(e.message, true);
@@ -239,11 +280,11 @@ function submitForm(ev) {
 function startEdit(h) {
   app.editingId = h.id;
   $('#fDate').value = h.date;
-  $('#fFrom').value = h.fromName ? `${h.fromName} (${h.from})` : String(h.from);
-  $('#fTo').value = h.toName ? `${h.toName} (${h.to})` : String(h.to);
+  $('#fFrom').value = h.fromName ? `${h.fromName} (${h.range.from})` : String(h.range.from);
+  $('#fTo').value = h.toName ? `${h.toName} (${h.range.to})` : String(h.range.to);
   $('#fNote').value = h.note;
-  $('#formTitle').textContent = '编辑这段记录';
-  $('#submitBtn').textContent = '保存修改';
+  $('#formTitle').textContent = t('editFormTitle');
+  $('#submitBtn').textContent = t('saveEditBtn');
   $('#cancelEdit').hidden = false;
   updatePreview();
   $('#hikeForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -261,7 +302,7 @@ function onHikeClick(ev) {
   } else if (btn.dataset.act === 'edit') {
     startEdit(hike);
   } else if (btn.dataset.act === 'del') {
-    if (confirm(`删除 ${hike.date} 这段记录？`)) {
+    if (confirm(t('deleteConfirm', hike.date))) {
       if (app.editingId === hike.id) resetForm();
       commit(app.hikes.filter((h) => h.id !== hike.id));
     }
@@ -285,14 +326,14 @@ function startPick(targetId) {
   endPick();
   app.pickTarget = targetId;
   app.view.setPickMode(true);
-  $('#pickHint').textContent = targetId === 'fFrom' ? '在地图上点一下路线，选择起点' : '在地图上点一下路线，选择终点';
+  $('#pickHint').textContent = targetId === 'fFrom' ? t('pickStartHint') : t('pickEndHint');
   $('#pickHint').hidden = false;
   document.querySelector(`.pick[data-target="${targetId}"]`).classList.add('active');
 }
 
 function onPick({ mile, hit }) {
   if (!hit) {
-    $('#pickHint').textContent = '离路线太远了，点在路线附近';
+    $('#pickHint').textContent = t('pickTooFar');
     return;
   }
   const near = anchorNear(mile, 0.15);
@@ -316,13 +357,13 @@ function tokenPrompt(reason) {
   const note = el('p', { class: 'map-note', text: '' });
   const input = el('input', {
     type: 'text', placeholder: 'pk.eyJ1…', autocomplete: 'off', spellcheck: false,
-    'aria-label': 'Mapbox 公开 token',
+    'aria-label': t('mapboxTokenAria'),
   });
-  const save = el('button', { type: 'button', text: '保存并加载地图' });
+  const save = el('button', { type: 'button', text: t('saveAndLoadMap') });
   save.addEventListener('click', () => {
     const value = input.value.trim();
     if (!value.startsWith('pk.')) {
-      note.textContent = '要填公开 token，以 pk. 开头。不要用 sk. 开头的密钥。';
+      note.textContent = t('tokenNeedsPk');
       return;
     }
     localStorage.setItem(TOKEN_KEY, value);
@@ -332,13 +373,15 @@ function tokenPrompt(reason) {
     el('p', { text: reason }),
     el('div', { class: 'inline' }, input, save),
     note,
-    el('p', { class: 'map-note', text: '这个 token 只保存在这台设备的浏览器里。想长期使用，把它写进 js/config.js。' }),
+    el('p', { class: 'map-note', text: t('tokenLocalNote') }),
   );
 }
 
 // ---------------------------------------------------------------- start
 
 export async function start() {
+  applyStaticI18n();
+  wireSwitches();
   try {
     const [routeData, anchorData, statesData, seed] = await Promise.all([
       getJSON(CONFIG.data.route),
@@ -353,16 +396,14 @@ export async function start() {
     app.hikes = stored ?? (seed ? store.parseImport(JSON.stringify(seed)) : []);
 
     $('#placeholderBanner').hidden = !routeData.placeholder;
-    $('#totalMi').textContent = fmt(app.route.length);
+    $('#totalMi').textContent = dist(app.route.length);
     $('#anchorList').replaceChildren(...app.anchors.map((a) =>
-      el('option', { value: `${a.name} (${a.mile.toFixed(1)})`, label: `${fmt(a.mile)} 英里` })));
+      el('option', { value: `${a.name} (${a.mile.toFixed(1)})`, label: dist(a.mile) })));
     $('#fDate').value = today();
     buildBlazes();
   } catch (e) {
-    const hint = location.protocol === 'file:'
-      ? '不能直接双击打开 index.html。在项目目录运行 python3 -m http.server，再访问 http://localhost:8000'
-      : e.message;
-    $('#loadError').textContent = `数据加载失败：${hint}`;
+    const hint = location.protocol === 'file:' ? t('fileProtocolHint') : e.message;
+    $('#loadError').textContent = t('loadErrorPrefix', hint);
     $('#loadError').hidden = false;
     return;
   }
@@ -387,9 +428,9 @@ export async function start() {
     if (!file) return;
     try {
       const incoming = store.parseImport(await file.text());
-      if (confirm(`导入 ${incoming.length} 条记录，并与现有记录合并（相同 id 会被覆盖）？`)) {
+      if (confirm(t('importConfirm', incoming.length))) {
         commit(store.mergeById(app.hikes, incoming));
-        flash(`已导入 ${incoming.length} 条记录`);
+        flash(t('importedFlash', incoming.length));
       }
     } catch (e) {
       flash(e.message, true);
@@ -400,9 +441,9 @@ export async function start() {
   const token = CONFIG.mapboxToken || localStorage.getItem(TOKEN_KEY) || '';
   const mapboxgl = globalThis.mapboxgl;
   if (!mapboxgl) {
-    showMapMessage(el('p', { text: '地图脚本没有加载出来。检查网络后刷新页面；下面的记录和统计仍然可用。' }));
+    showMapMessage(el('p', { text: t('mapScriptMissing') }));
   } else if (!token) {
-    tokenPrompt('还没有 Mapbox token。填入公开 token（pk. 开头）后加载地图；没有的话，在 account.mapbox.com 创建一个。');
+    tokenPrompt(t('noTokenYet'));
   } else {
     app.view = createMapView({
       mapboxgl,
@@ -412,10 +453,12 @@ export async function start() {
       anchors: app.anchors,
       bordersUrl: CONFIG.data.borders,
       container: 'map',
+      unit: getUnit(),
+      formatMile: (mile) => t('mapPopupMile', dist(mile)),
       onPick,
       onError: (err) => {
         if (err?.status === 401 || err?.status === 403) {
-          tokenPrompt('Mapbox 拒绝了这个 token（401/403）。检查 token 是否有效，以及 URL 限制里是否包含当前网址。');
+          tokenPrompt(t('tokenRejected'));
         }
       },
     });

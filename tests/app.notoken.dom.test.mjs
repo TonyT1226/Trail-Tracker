@@ -56,7 +56,7 @@ test('rejects a secret (sk.) token', () => {
   const input = $('#mapMsg input');
   input.value = 'sk.secret';
   $('#mapMsg button').click();
-  assert.match($('#mapMsg').textContent, /不要用 sk\./);
+  assert.match($('#mapMsg').textContent, /not a secret key starting with sk\./);
   assert.equal(localStorage.getItem('at-tracker:token'), null);
 });
 
@@ -73,5 +73,5 @@ test('a data loading failure is reported instead of a blank page', async () => {
   define('fetch', async () => ({ ok: false, status: 500, json: async () => null }));
   await start();
   assert.equal($('#loadError').hidden, false);
-  assert.match($('#loadError').textContent, /加载失败/);
+  assert.match($('#loadError').textContent, /Couldn.t load data/);
 });

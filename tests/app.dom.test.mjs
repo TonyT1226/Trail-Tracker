@@ -68,7 +68,7 @@ const type = (sel, value) => {
   node.dispatchEvent(new window.Event('input', { bubbles: true }));
 };
 const submit = () => $('#hikeForm').requestSubmit();
-const savedHikes = () => JSON.parse(localStorage.getItem('at-tracker:hikes:v1'));
+const savedHikes = () => JSON.parse(localStorage.getItem('at-tracker:hikes:v1')).activities;
 
 const { CONFIG } = await import('../js/config.js');
 // Fixed test value so this suite doesn't depend on whether a developer's local
@@ -79,13 +79,15 @@ const { start } = await import('../js/app.js');
 await start();
 (handlers.load || []).forEach((fn) => fn()); // map finishes loading
 
-test('initial render from real route data', () => {
-  assert.equal($('#totalMi').textContent, '2,197.9');
+test('initial render from real route data, in English by default', () => {
+  assert.equal(document.documentElement.lang, 'en');
+  assert.equal($('#totalMi').textContent, '2,197.9 mi');
   assert.equal($('#placeholderBanner').hidden, true);
   assert.equal($$('#anchorList option').length, anchors.length);
   assert.equal($$('#states li').length, 14);                 // stateGroups is [] by default -- all 14 states separate
-  assert.match($$('#states li')[1].textContent, /^北卡罗来纳/);
-  assert.match($$('#states li')[2].textContent, /^田纳西/);
+  assert.match($$('#states li')[0].querySelector('.state-name').textContent, /^Georgia/);
+  assert.match($$('#states li')[1].querySelector('.state-name').textContent, /^North Carolina/);
+  assert.match($$('#states li')[2].querySelector('.state-name').textContent, /^Tennessee/);
   assert.equal($$('#blazes i').length, 100);
   assert.equal($$('#hikes li').length, 0);
   assert.equal($('#emptyMsg').hidden, false);
@@ -97,14 +99,17 @@ test('logging a hike by place names', () => {
   type('#fDate', '2026-05-03');
   type('#fFrom', 'Springer Mountain');
   type('#fTo', 'Neels Gap');
-  assert.match($('#preview').textContent, /新增/);
+  assert.match($('#preview').textContent, /new/);
   submit();
   assert.equal($$('#hikes li').length, 1);
   assert.equal($('#doneMi').textContent, mileOf('Neels Gap').toFixed(1));
-  assert.match($('#formMsg').textContent, /已记录/);
+  assert.match($('#formMsg').textContent, /Logged/);
   assert.equal($('#fFrom').value, '');                          // form reset
   assert.equal(savedHikes().length, 1);
   assert.equal(savedHikes()[0].toName, 'Neels Gap');
+  assert.deepEqual(savedHikes()[0].range, { from: 0, to: mileOf('Neels Gap') });
+  assert.equal(savedHikes()[0].trailId, 'AT');
+  assert.equal(savedHikes()[0].source, 'manual');
   assert.equal($('#emptyMsg').hidden, true);
   assert.match($$('#hikes li')[0].textContent, /Springer Mountain → Neels Gap/);
   const pct = (mileOf('Neels Gap') / 2197.9) * 100;
@@ -118,7 +123,7 @@ test('overlapping miles are not counted twice', () => {
   type('#fDate', '2026-05-04');
   type('#fFrom', '20');
   type('#fTo', 'Tesnatee Gap');
-  assert.match($('#preview').textContent, /之前走过/);
+  assert.match($('#preview').textContent, /already walked/);
   submit();
   assert.equal($$('#hikes li').length, 2);
   assert.equal($('#doneMi').textContent, mileOf('Tesnatee Gap').toFixed(1));   // union of 0..Neels and 20..Indian Grave
@@ -139,16 +144,16 @@ test('bad input shows a message and saves nothing', () => {
   type('#fFrom', 'Nowhere Shelter');
   type('#fTo', '10');
   submit();
-  assert.match($('#formMsg').textContent, /找不到/);
+  assert.match($('#formMsg').textContent, /Can.t find/);
   assert.ok($('#formMsg').classList.contains('err'));
   type('#fFrom', '0');
   type('#fTo', '99999');
   submit();
-  assert.match($('#formMsg').textContent, /超出范围/);
+  assert.match($('#formMsg').textContent, /out of range/);
   type('#fFrom', '10');
   type('#fTo', '10');
   submit();
-  assert.match($('#formMsg').textContent, /同一处/);
+  assert.match($('#formMsg').textContent, /same spot/);
   assert.equal(savedHikes().length, before);
 });
 
@@ -156,14 +161,14 @@ test('editing a record', () => {
   const rows = $$('#hikes li');
   const target = rows.find((r) => r.textContent.includes('2026-05-03'));
   target.querySelector('button[data-act="edit"]').click();
-  assert.equal($('#formTitle').textContent, '编辑这段记录');
+  assert.equal($('#formTitle').textContent, 'Edit this hike');
   assert.equal($('#fFrom').value, 'Springer Mountain (0)');
   assert.equal($('#cancelEdit').hidden, false);
-  type('#fNote', '下雨，住 Blood Mountain 山顶');
+  type('#fNote', 'Rained, stayed near Blood Mountain summit');
   submit();
   assert.equal($$('#hikes li').length, 3);
-  assert.match($('#hikes').textContent, /下雨/);
-  assert.equal($('#formTitle').textContent, '记录一段徒步');
+  assert.match($('#hikes').textContent, /Rained/);
+  assert.equal($('#formTitle').textContent, 'Log a hike');
   assert.equal(savedHikes().length, 3);
 });
 
@@ -178,7 +183,7 @@ test('deleting a record', () => {
 
 test('per-state progress reflects the log', () => {
   const georgia = $$('#states li')[0];
-  assert.match(georgia.querySelector('.state-name').textContent, /乔治亚/);
+  assert.match(georgia.querySelector('.state-name').textContent, /Georgia/);
   const width = parseFloat(georgia.querySelector('.fill').style.width);
   assert.ok(width > 30 && width < 100, `Georgia bar at ${width}%`);
 });
