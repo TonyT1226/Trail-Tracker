@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="AT Progress Tracker" width="160" />
+</p>
+
 # AT Progress Tracker
 
 *(中文说明见 [README.zh.md](README.zh.md))*

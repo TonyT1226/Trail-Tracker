@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="AT 进度看板" width="160" />
+</p>
+
 # AT 进度看板
 
 *(English README: [README.md](README.md))*
