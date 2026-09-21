@@ -71,6 +71,10 @@ const submit = () => $('#hikeForm').requestSubmit();
 const savedHikes = () => JSON.parse(localStorage.getItem('at-tracker:hikes:v1'));
 
 const { CONFIG } = await import('../js/config.js');
+// Fixed test value so this suite doesn't depend on whether a developer's local
+// config.js happens to carry a real token (mapboxToken is gitignored-in-spirit --
+// see js/config.js).
+CONFIG.mapboxToken = 'pk.test-config-token';
 const { start } = await import('../js/app.js');
 await start();
 (handlers.load || []).forEach((fn) => fn()); // map finishes loading
@@ -79,8 +83,9 @@ test('initial render from real route data', () => {
   assert.equal($('#totalMi').textContent, '2,197.9');
   assert.equal($('#placeholderBanner').hidden, true);
   assert.equal($$('#anchorList option').length, anchors.length);
-  assert.equal($$('#states li').length, 13);                 // 14 states, NC + TN listed together
-  assert.match($$('#states li')[1].textContent, /北卡罗来纳 \/ 田纳西/);
+  assert.equal($$('#states li').length, 14);                 // stateGroups is [] by default -- all 14 states separate
+  assert.match($$('#states li')[1].textContent, /^北卡罗来纳/);
+  assert.match($$('#states li')[2].textContent, /^田纳西/);
   assert.equal($$('#blazes i').length, 100);
   assert.equal($$('#hikes li').length, 0);
   assert.equal($('#emptyMsg').hidden, false);
@@ -182,8 +187,7 @@ test('no token prompt is shown when a token is configured', () => {
   assert.equal($('#mapMsg').hidden, true);
   assert.equal(calls.filter(([k]) => k === 'new').length, 1);
   assert.equal(calls.find(([k]) => k === 'new')[1].accessToken, undefined); // token goes via mapboxgl.accessToken
-  // config.js ships with mapboxToken left empty on purpose (nothing to commit), so this
-  // suite falls back to the localStorage token set up above -- assert against that.
-  assert.equal(CONFIG.mapboxToken, '');
-  assert.equal(globalThis.mapboxgl.accessToken, 'pk.test');
+  // CONFIG.mapboxToken (forced above) takes precedence over the localStorage
+  // fallback set up at the top of this file.
+  assert.equal(globalThis.mapboxgl.accessToken, CONFIG.mapboxToken);
 });

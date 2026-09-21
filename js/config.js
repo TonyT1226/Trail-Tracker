@@ -8,10 +8,11 @@ export const CONFIG = {
   // Outdoors has contour lines, hillshade, trails and state names built in.
   mapStyle: 'mapbox://styles/mapbox/outdoors-v12',
 
-  // States to count together in the per-state progress list. NC and TN are merged by
-  // default because the trail zig-zags along their shared line for ~200 miles, so a
-  // clean split is not meaningful. Use [] to show all 14 states separately.
-  stateGroups: [['NC', 'TN']],
+  // States to count together in the per-state progress list, e.g. [['NC', 'TN']].
+  // All 14 states are shown separately by default. The trail zig-zags across the
+  // NC/TN line for ~200 miles, so those two totals are each made of many short
+  // alternating segments -- still added up correctly, just not a tidy shape on a map.
+  stateGroups: [],
 
   data: {
     route: 'data/route.json',
