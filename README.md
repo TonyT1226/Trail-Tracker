@@ -1,11 +1,12 @@
 # AT 进度看板
 
-记录你走过的 Appalachian Trail 里程，在地图上把走完的部分标成洋红色，并按州统计进度。纯静态网站，部署在 GitHub Pages，不需要后端，也不需要构建步骤。
+记录你走过的 Appalachian Trail 里程，在地图上把走完的部分标成洋红色，并按州统计进度。纯静态网站，部署在 GitHub Pages，不需要后端，也不需要构建步骤。代码遵循 [MIT 协议](LICENSE)；步道路线数据另有出处和许可，见「数据来源与许可」一节。
 
 ## 整体结构
 
 ```
 index.html            页面骨架
+start.command         双击启动本地服务器并打开浏览器
 css/style.css         样式（松绿面板 + 白色路标 + 洋红完成线）
 js/
   config.js           你要改的设置：Mapbox token、州合并规则、数据路径
@@ -74,7 +75,17 @@ python3 scripts/build_states.py data/raw/cb_2023_us_state_500k.zip --min-run 0.8
 
 北卡和田纳西之间约 200 英里，路线沿着州界来回穿插，弗吉尼亚和西弗吉尼亚之间也有类似的地方。这些地方按多边形划分会产生很多小段（NC、TN 各有十几段），但各州进度列表只看总里程，段数不影响统计结果，所以默认按 14 个州分别显示。如果想把某几个州合并成一行，在 `js/config.js` 的 `stateGroups` 里加，例如 `[['NC', 'TN']]`。
 
+## 数据来源与许可
+
+- **步道中心线**（`data/route.json` 的原始输入）：National Park Service Appalachian National Scenic Trail 与 Appalachian Trail Conservancy 联合维护的 `ANST_Centerline` 图层（ArcGIS Online 公开图层）。图层自带的版权声明是 `National Park Service Appalachian National Scenic Trail & Appalachian Trail Conservancy, 2023`，附带的说明是"仅供一般参考、不是法律文件，NPS / USDA Forest Service / ATC 及合作方不对准确性、可靠性或完整性做任何明示或暗示的保证"——这是免责声明，不是一份正式的可复用许可（既没写公有领域，也没写具体的转载条款）。因为版权方里包含 ATC 这个非营利机构（不是纯联邦政府作品），不能简单当作 public domain。本项目按上面那行原文署名使用；如果你打算更大范围地重新分发这份几何数据，建议自己联系 ATC 确认。
+- **官方总里程**（默认 2197.9 英里）：ATC 每年发布的官方数据，当前用的是 2026 年的数字，见 `build_route.py --official-miles`。
+- **地名兴趣点**（`data/anchors.json` 的庇护所、垭口、村镇）：来自 OpenStreetMap，遵循 [ODbL](https://opendatacommons.org/licenses/odbl/) 协议，使用需署名 "© OpenStreetMap contributors"。
+- **州界**（`data/states.json`、`data/state_borders.geojson`）：美国人口普查局（Census Bureau）Cartographic Boundary File，属美国联邦政府作品，公有领域（Public Domain），没有版权限制。
+- **地图底图**：Mapbox（`mapStyle` 见 `js/config.js`），页面右下角会自动显示 Mapbox 和 OpenStreetMap 的署名，遵循 Mapbox 自己的服务条款。
+
 ## 本地运行与测试
+
+双击 [`start.command`](start.command) 会自动启动本地服务器并打开浏览器（第一次运行 macOS 可能提示"来自未标识开发者"，去系统设置里点"仍要打开"）。或者手动：
 
 ```bash
 python3 -m http.server 8000     # 然后访问 http://localhost:8000（不能直接双击 index.html）
