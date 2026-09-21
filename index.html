@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>AT 进度看板</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.31.0/mapbox-gl.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app">
+    <main class="map-wrap">
+      <div id="map" role="application" aria-label="Appalachian Trail 地图"></div>
+      <div class="map-tools">
+        <button type="button" id="fitBtn">看全程</button>
+        <button type="button" id="terrainBtn" aria-pressed="false">3D 地形</button>
+      </div>
+      <p class="pick-hint" id="pickHint" hidden></p>
+      <div class="map-msg" id="mapMsg" hidden></div>
+    </main>
+
+    <aside class="panel">
+      <header class="head">
+        <h1>Appalachian Trail</h1>
+        <p class="sub">乔治亚 Springer Mountain 到缅因 Mount Katahdin</p>
+      </header>
+
+      <p class="banner" id="placeholderBanner" hidden>
+        现在显示的是占位路线：用直线连起大约 58 个航点，不是真实的 AT，里程也是估算。按 README 运行数据脚本后会换成真实路线。
+      </p>
+      <p class="banner error" id="loadError" hidden></p>
+
+      <section class="progress" aria-label="总进度">
+        <div class="blazes" id="blazes" role="img" aria-label="已完成 0%"></div>
+        <p class="figures">
+          <span class="big" id="doneMi">0.0</span>
+          <span class="of">/ <span id="totalMi">0</span> 英里</span>
+          <span class="pct" id="pct">0.0%</span>
+        </p>
+        <dl class="facts">
+          <div><dt>剩余</dt><dd id="remainMi">—</dd></div>
+          <div><dt>徒步天数</dt><dd id="dayCount">—</dd></div>
+          <div><dt>记录</dt><dd id="hikeCount">—</dd></div>
+          <div><dt>最近一次</dt><dd id="lastDate">—</dd></div>
+        </dl>
+      </section>
+
+      <section id="statesSection" aria-labelledby="statesTitle">
+        <h2 id="statesTitle">各州进度</h2>
+        <ol class="states" id="states"></ol>
+      </section>
+
+      <section aria-labelledby="formTitle">
+        <h2 id="formTitle">记录一段徒步</h2>
+        <form id="hikeForm" autocomplete="off" novalidate>
+          <label class="field">
+            <span>完成日期</span>
+            <input type="date" id="fDate" required>
+          </label>
+          <div class="pair">
+            <label class="field">
+              <span>起点</span>
+              <span class="inline">
+                <input id="fFrom" list="anchorList" placeholder="里程或地名" required>
+                <button type="button" class="pick" data-target="fFrom" aria-label="在地图上选起点">选点</button>
+              </span>
+            </label>
+            <label class="field">
+              <span>终点</span>
+              <span class="inline">
+                <input id="fTo" list="anchorList" placeholder="里程或地名" required>
+                <button type="button" class="pick" data-target="fTo" aria-label="在地图上选终点">选点</button>
+              </span>
+            </label>
+          </div>
+          <p class="preview" id="preview" aria-live="polite"></p>
+          <label class="field">
+            <span>备注</span>
+            <input id="fNote" placeholder="天气、同行的人、住在哪">
+          </label>
+          <div class="actions">
+            <button type="submit" id="submitBtn" class="primary">记录这段</button>
+            <button type="button" id="cancelEdit" class="ghost" hidden>取消编辑</button>
+          </div>
+          <p class="msg" id="formMsg" aria-live="polite"></p>
+          <datalist id="anchorList"></datalist>
+        </form>
+      </section>
+
+      <section aria-labelledby="hikesTitle">
+        <h2 id="hikesTitle">徒步记录</h2>
+        <ol class="hikes" id="hikes"></ol>
+        <p class="empty" id="emptyMsg">还没有记录。填一段上面的表单，或者点“选点”在地图上选起点和终点。</p>
+      </section>
+
+      <footer class="foot">
+        <div class="tools">
+          <button type="button" class="ghost" id="exportBtn">导出 JSON</button>
+          <label class="ghost btn">导入 JSON<input type="file" id="importFile" accept="application/json,.json" hidden></label>
+        </div>
+        <p class="credit">记录只保存在这个浏览器里，换设备前先导出。路线：美国国家公园管理局 Appalachian Trail Park Office 与 Appalachian Trail Conservancy。地名：© OpenStreetMap 贡献者。</p>
+      </footer>
+    </aside>
+  </div>
+
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.31.0/mapbox-gl.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
