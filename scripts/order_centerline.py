@@ -29,8 +29,8 @@ This script fixes that in three steps:
      artifacts, which are dropped before ordering anyway).
 
 Usage:
-    python scripts/order_centerline.py data/raw/centerline.geojson
-    python scripts/build_route.py data/raw/centerline_ordered.geojson -o data/trails/AT/route.json
+    python scripts/order_centerline.py data/raw/AT/centerline.geojson
+    python scripts/build_route.py data/raw/AT/centerline_ordered.geojson
 """
 from __future__ import annotations
 
@@ -246,7 +246,7 @@ def order_chains(chains, log=print):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("input", help="raw centerline GeoJSON from fetch_centerline.py")
-    ap.add_argument("-o", "--output", default="data/raw/centerline_ordered.geojson")
+    ap.add_argument("-o", "--output", default="data/raw/AT/centerline_ordered.geojson")
     ap.add_argument("--keep-alt-names", action="store_true",
                     help="don't drop side/alternate trails sharing the ANST layer")
     args = ap.parse_args()
@@ -292,7 +292,7 @@ def main():
     }
     size = write_json(args.output, out)
     print(f"wrote {args.output} ({size / 1024 / 1024:.1f} MB)")
-    print("next: python scripts/build_route.py", args.output, "-o data/trails/AT/route.json")
+    print("next: python scripts/build_route.py", args.output)
     return 0
 
 

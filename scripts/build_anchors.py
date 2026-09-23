@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Build data/trails/AT/anchors.json (named places with mile markers) from a POI GeoJSON.
+"""Build data/trails/<trail>/anchors.json (named places with mile markers) from a POI GeoJSON.
 
-Every POI is snapped onto data/trails/AT/route.json, so its mile comes from the same
+Every POI is snapped onto the trail's route.json, so its mile comes from the same
 scale as the route (no need to type in mile markers by hand).
 
 Usage:
-    python scripts/build_anchors.py data/raw/osm_pois.geojson
+    python scripts/build_anchors.py data/raw/AT/osm_pois.geojson
+    python scripts/build_anchors.py --trail PCT data/raw/PCT/osm_pois.geojson
 """
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ import json
 import sys
 
 from atlib import PipelineError, load_route, snap, write_json
+from trail_profiles import AT, add_trail_arg, get_profile
 
 # how far off the trail a place may be and still count (miles)
 MAX_OFF = {"shelter": 0.6, "campsite": 0.6, "gap": 0.5}
@@ -36,7 +38,7 @@ def infer_kind(props):
     return None
 
 
-def build_anchors(pois, route_path, log=print):
+def build_anchors(pois, route_path, log=print, profile=AT):
     route, coords, miles = load_route(route_path)
     total = float(miles[-1])
     found = []
@@ -81,9 +83,9 @@ def build_anchors(pois, route_path, log=print):
 
     # termini are always present and pinned to the ends of the route
     termini = [
-        {"name": "Springer Mountain", "kind": "terminus", "mile": 0.0,
+        {"name": profile.start_name, "kind": "terminus", "mile": 0.0,
          "lat": round(coords[0][1], 5), "lon": round(coords[0][0], 5), "off": 0.0},
-        {"name": "Mount Katahdin", "kind": "terminus", "mile": round(total, 3),
+        {"name": profile.end_name, "kind": "terminus", "mile": round(total, 3),
          "lat": round(coords[-1][1], 5), "lon": round(coords[-1][0], 5), "off": 0.0},
     ]
     anchors = sorted(termini + [a for a in deduped if a["kind"] != "terminus"], key=lambda a: a["mile"])
@@ -94,15 +96,18 @@ def build_anchors(pois, route_path, log=print):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("pois", help="GeoJSON of points (OSM tags or an explicit 'kind' property)")
-    ap.add_argument("--route", default="data/trails/AT/route.json")
-    ap.add_argument("-o", "--output", default="data/trails/AT/anchors.json")
+    add_trail_arg(ap)
+    ap.add_argument("--route", help="default: data/trails/<trail>/route.json")
+    ap.add_argument("-o", "--output", help="default: data/trails/<trail>/anchors.json")
     args = ap.parse_args()
+    profile = get_profile(args.trail)
+    output = args.output or profile.out("anchors.json")
     try:
         with open(args.pois, encoding="utf-8") as f:
             data = json.load(f)
-        out = build_anchors(data.get("features", []), args.route)
-        size = write_json(args.output, out)
-        print(f"wrote {args.output} ({size / 1024:.0f} KB)")
+        out = build_anchors(data.get("features", []), args.route or profile.out("route.json"), profile=profile)
+        size = write_json(output, out)
+        print(f"wrote {output} ({size / 1024:.0f} KB)")
         return 0
     except PipelineError as e:
         print(f"error: {e}", file=sys.stderr)

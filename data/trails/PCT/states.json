@@ -1,0 +1,1 @@
+{"order":["CA","OR","WA"],"states":{"CA":{"name":"California","ranges":[[0.0,1693.384]],"total":1693.38},"OR":{"name":"Oregon","ranges":[[1693.384,2150.231]],"total":456.85},"WA":{"name":"Washington","ranges":[[2150.231,2655.84]],"total":505.61}}}

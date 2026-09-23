@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "PCT",
+  "name": "Pacific Crest Trail",
+  "shortName": "PCT",
+  "color": "#1f78b4",
+  "subtitle": {
+    "en": "Mexican border near Campo, CA to the Canadian border, WA",
+    "zh": "从加州 Campo 附近的美墨边境到华盛顿州的美加边境"
+  },
+  "credit": {
+    "en": "Trail and mile markers: Pacific Crest Trail Association, 2026 (CC BY 4.0). Place names: © OpenStreetMap contributors.",
+    "zh": "路线与里程标：Pacific Crest Trail Association，2026（CC BY 4.0）。地名：© OpenStreetMap 贡献者。"
+  },
+  "files": {
+    "route": "route.json",
+    "anchors": "anchors.json",
+    "states": "states.json",
+    "borders": "state_borders.geojson"
+  }
+}

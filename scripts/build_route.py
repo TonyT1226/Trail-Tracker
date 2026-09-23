@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
-"""Build data/trails/AT/route.json from a raw AT centerline GeoJSON.
+"""Build data/trails/<trail>/route.json from a raw centerline GeoJSON.
 
 Pipeline: read LineStrings -> merge/chain into ONE south->north path ->
-stamp cumulative miles (scaled to the official length, optionally calibrated
-against known mile markers) -> simplify -> write compact JSON.
+stamp cumulative miles (scaled to the official length, or calibrated against
+official mile markers) -> simplify -> write compact JSON.
 
 Usage:
-    python scripts/build_route.py data/raw/centerline.geojson --inspect
-    python scripts/build_route.py data/raw/centerline.geojson -o data/trails/AT/route.json
+    python scripts/build_route.py data/raw/AT/centerline_ordered.geojson --inspect
+    python scripts/build_route.py data/raw/AT/centerline_ordered.geojson          # -> data/trails/AT/route.json
+    python scripts/build_route.py --trail PCT data/raw/PCT/centerline.geojson     # uses data/raw/PCT/mile_markers.json if present
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections import Counter
 
@@ -20,12 +22,10 @@ import numpy as np
 from shapely.geometry import MultiLineString
 from shapely.ops import linemerge
 
-from atlib import (
-    KATAHDIN, SPRINGER, PipelineError, cumulative_miles, haversine_mi, snap,
-    to_local_m, write_json,
-)
+from atlib import PipelineError, cumulative_miles, haversine_mi, snap, to_local_m, write_json
+from trail_profiles import AT, add_trail_arg, get_profile
 
-OFFICIAL_MILES_2026 = 2197.9   # ATC official length for 2026
+OFFICIAL_MILES_2026 = AT.official_miles   # kept for make_placeholder.py
 
 
 # ---------------------------------------------------------------- reading
@@ -90,8 +90,8 @@ def merge_lines(lines):
     return [list(g.coords) for g in merged.geoms]
 
 
-def chain(parts):
-    """Chain parts into one path starting at Springer. Returns (coords, jumps).
+def chain(parts, start=AT.start):
+    """Chain parts into one path starting at `start` (lon, lat). Returns (coords, jumps).
 
     jumps = [(distance_mi, position_index_in_output, (lon, lat))] for places where
     consecutive parts did not touch and had to be joined with a straight line.
@@ -104,7 +104,7 @@ def chain(parts):
     for i in remaining:
         for rev in (False, True):
             end = parts[i][-1] if rev else parts[i][0]
-            d = dist(end, SPRINGER)
+            d = dist(end, start)
             if best is None or d < best[0]:
                 best = (d, i, rev)
     _, i, rev = best
@@ -165,22 +165,45 @@ def rdp_indices(xy, tol):
 
 # ---------------------------------------------------------------- calibration
 
+CAL_WINDOW_MI = 25.0   # search this far (raw miles) either side of where a marker should be
+CAL_MAX_OFF_MI = 0.5   # markers farther than this from the line are ignored
+
+
 def calibrate(coords, raw_miles, cal_points, official_total, log=print):
-    """Piecewise-linear map from raw geometric miles to official miles."""
+    """Piecewise-linear map from raw geometric miles to official miles.
+
+    Each marker is first snapped within a window around where its official mile says
+    it should be -- fast on long routes, and it keeps a marker from snapping onto a
+    far part of the trail that happens to pass close by -- and only searched for along
+    the whole route if it isn't found there.
+    """
+    coords = np.asarray(coords, dtype=float)
+    raw_total = float(raw_miles[-1])
+    ratio = raw_total / official_total
     xs, ys = [0.0], [0.0]
-    pts = []
+    pts, far = [], 0
     for c in cal_points:
-        r, off = snap(coords, raw_miles, c["lon"], c["lat"])
-        if off > 0.5:
-            log(f"  warning: calibration point {c.get('name', c)} is {off:.2f} mi from the route")
+        guess = float(c["mile"]) * ratio
+        lo = max(int(np.searchsorted(raw_miles, guess - CAL_WINDOW_MI)) - 1, 0)
+        hi = min(int(np.searchsorted(raw_miles, guess + CAL_WINDOW_MI)) + 1, len(raw_miles))
+        r, off = (snap(coords[lo:hi], raw_miles[lo:hi], c["lon"], c["lat"])
+                  if hi - lo >= 2 else (0.0, float("inf")))
+        if off > CAL_MAX_OFF_MI:   # not where the scale says it should be -- look everywhere
+            r, off = snap(coords, raw_miles, c["lon"], c["lat"])
+        if off > CAL_MAX_OFF_MI:
+            far += 1
+            log(f"  skipped calibration point {c.get('name', c)!r}: {off:.2f} mi from the route")
+            continue
         pts.append((r, float(c["mile"]), c.get("name", "")))
+    if far:
+        log(f"  {far} calibration points were too far from the route")
     for r, m, name in sorted(pts):
-        if r <= xs[-1] or m <= ys[-1] or r >= raw_miles[-1]:
+        if r <= xs[-1] or m <= ys[-1] or r >= raw_total or m >= official_total:
             log(f"  skipped calibration point {name!r}: not increasing / out of range")
             continue
         xs.append(r)
         ys.append(m)
-    xs.append(float(raw_miles[-1]))
+    xs.append(raw_total)
     ys.append(float(official_total))
     return np.interp(raw_miles, xs, ys)
 
@@ -188,12 +211,12 @@ def calibrate(coords, raw_miles, cal_points, official_total, log=print):
 # ---------------------------------------------------------------- main build
 
 def build_route(features, official_miles=OFFICIAL_MILES_2026, tolerance_m=15.0,
-                cal_points=None, source="", placeholder=False, force=False, log=print):
+                cal_points=None, source="", placeholder=False, force=False, log=print, profile=AT):
     lines, skipped = extract_lines(features)
     if not lines:
         raise PipelineError("No LineString geometry found in the input.")
     parts = merge_lines(lines)
-    coords, jumps = chain(parts)
+    coords, jumps = chain(parts, profile.start)
     raw = cumulative_miles(coords)
     raw_total = float(raw[-1])
     log(f"input: {len(lines)} line parts -> {len(parts)} after merging "
@@ -205,12 +228,12 @@ def build_route(features, official_miles=OFFICIAL_MILES_2026, tolerance_m=15.0,
         log(f"  gap of {d:.3f} mi near raw mile {mile:.1f} at lon/lat {pt[0]:.4f}, {pt[1]:.4f}")
 
     problems = []
-    d0 = haversine_mi(*coords[0], *SPRINGER)
-    d1 = haversine_mi(*coords[-1], *KATAHDIN)
+    d0 = haversine_mi(*coords[0], *profile.start)
+    d1 = haversine_mi(*coords[-1], *profile.end)
     if d0 > 3:
-        problems.append(f"route does not start at Springer Mountain (off by {d0:.1f} mi)")
+        problems.append(f"route does not start at the {profile.start_name} (off by {d0:.1f} mi)")
     if d1 > 3:
-        problems.append(f"route does not end at Katahdin (off by {d1:.1f} mi)")
+        problems.append(f"route does not end at the {profile.end_name} (off by {d1:.1f} mi)")
     if big:
         problems.append(f"{len(big)} gaps longer than 0.05 mi were bridged with straight lines")
     if official_miles and abs(raw_total / official_miles - 1) > 0.02:
@@ -224,21 +247,22 @@ def build_route(features, official_miles=OFFICIAL_MILES_2026, tolerance_m=15.0,
 
     if cal_points:
         miles = calibrate(coords, raw, cal_points, official_miles or raw_total, log)
-        log(f"calibrated against {len(cal_points)} mile markers")
+        log(f"calibrated against {len(cal_points)} mile markers "
+            f"(overall scale {(official_miles or raw_total) / raw_total:.4f})")
     elif official_miles:
         miles = raw * (official_miles / raw_total)
         log(f"scaled by {official_miles / raw_total:.4f} to match official {official_miles} mi")
     else:
         miles = raw
 
-    xy = to_local_m(coords, -76.0, 40.0)
+    xy = to_local_m(coords, *profile.proj_center)
     keep = rdp_indices(xy, tolerance_m)
     out_coords = [[round(coords[i][0], 5), round(coords[i][1], 5)] for i in keep]
     out_miles = [round(float(miles[i]), 3) for i in keep]
     log(f"simplified {len(coords)} -> {len(keep)} vertices (tolerance {tolerance_m} m)")
 
     return {
-        "name": "Appalachian Trail",
+        "name": profile.name,
         "source": source,
         "placeholder": bool(placeholder),
         "totalMiles": out_miles[-1],
@@ -250,16 +274,26 @@ def build_route(features, official_miles=OFFICIAL_MILES_2026, tolerance_m=15.0,
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("input", help="raw centerline GeoJSON")
-    ap.add_argument("-o", "--output", default="data/trails/AT/route.json")
-    ap.add_argument("--official-miles", type=float, default=OFFICIAL_MILES_2026,
-                    help="official total length; 0 keeps the raw geometric miles")
+    add_trail_arg(ap)
+    ap.add_argument("-o", "--output", help="default: data/trails/<trail>/route.json")
+    ap.add_argument("--official-miles", type=float,
+                    help="official total length (default: the trail's current official figure); 0 keeps the raw geometric miles")
     ap.add_argument("--tolerance", type=float, default=15.0, help="simplify tolerance in metres")
-    ap.add_argument("--calibration", help="JSON list of {name, lat, lon, mile} official mile markers")
-    ap.add_argument("--source", default="NPS Appalachian Trail Park Office / Appalachian Trail Conservancy")
+    ap.add_argument("--calibration",
+                    help="JSON list of {name, lat, lon, mile} official mile markers "
+                         "(default: data/raw/<trail>/mile_markers.json if it exists)")
+    ap.add_argument("--no-calibration", action="store_true", help="scale to the official length even if markers exist")
+    ap.add_argument("--source", help="default: the trail's data source")
     ap.add_argument("--placeholder", action="store_true")
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--inspect", action="store_true", help="just describe the input and exit")
     args = ap.parse_args()
+    profile = get_profile(args.trail)
+    output = args.output or profile.out("route.json")
+    official = profile.official_miles if args.official_miles is None else args.official_miles
+    cal_path = args.calibration
+    if cal_path is None and not args.no_calibration and os.path.exists(profile.raw("mile_markers.json")):
+        cal_path = profile.raw("mile_markers.json")
 
     try:
         features = load_features(args.input)
@@ -267,13 +301,15 @@ def main():
             inspect(features)
             return 0
         cal = None
-        if args.calibration:
-            with open(args.calibration, encoding="utf-8") as f:
+        if cal_path and not args.no_calibration:
+            with open(cal_path, encoding="utf-8") as f:
                 cal = json.load(f)
-        route = build_route(features, args.official_miles or None, args.tolerance, cal,
-                            args.source, args.placeholder, args.force)
-        size = write_json(args.output, route)
-        print(f"wrote {args.output} ({size / 1024:.0f} KB), total {route['totalMiles']} mi")
+            print(f"calibrating with {cal_path}")
+        route = build_route(features, official or None, args.tolerance, cal,
+                            profile.source if args.source is None else args.source,
+                            args.placeholder, args.force, profile=profile)
+        size = write_json(output, route)
+        print(f"wrote {output} ({size / 1024:.0f} KB), total {route['totalMiles']} mi")
         return 0
     except PipelineError as e:
         print(f"error: {e}", file=sys.stderr)

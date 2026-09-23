@@ -61,18 +61,21 @@ tests/                JS 与 Python 测试
 
 ## 数据流水线
 
+每个脚本都接受 `--trail AT|PCT`（默认 `AT`），据此从 `scripts/trail_profiles.py` 取对应的数据源、起终点、官方里程、州列表和默认路径。原始下载放在 `data/raw/<trail>/`（不进 git），生成的文件放在 `data/trails/<trail>/`。
+
 ```
-fetch_centerline.py   ->  data/raw/centerline.geojson          NPS/ATC 官方中心线（~3000 段独立测量的线）
-order_centerline.py   ->  data/raw/centerline_ordered.geojson  按南到北顺序拼接成一条线（见下）
-build_route.py        ->  data/trails/AT/route.json                      定向、按官方总长换算里程、简化
-fetch_osm_pois.py     ->  data/raw/osm_pois.geojson            OpenStreetMap 的庇护所/垭口/村镇
-build_anchors.py      ->  data/trails/AT/anchors.json                    吸附到路线上，得到里程
-(下载 Census 州界)    ->  data/raw/cb_2023_us_state_500k.zip
-build_states.py       ->  data/trails/AT/states.json, data/trails/AT/state_borders.geojson
-make_placeholder.py   ->  占位数据（直线连接约 58 个航点，仅供试用）
+fetch_centerline.py   ->  data/raw/<trail>/centerline.geojson     官方中心线
+                          data/raw/PCT/mile_markers.json          （仅 PCT）PCTA 官方半英里里程标
+order_centerline.py   ->  data/raw/AT/centerline_ordered.geojson  （仅 AT）按南到北顺序拼接成一条线（见下）
+build_route.py        ->  data/trails/<trail>/route.json          定向、赋予官方里程、简化
+fetch_osm_pois.py     ->  data/raw/<trail>/osm_pois.geojson       OpenStreetMap 的庇护所/营地/垭口
+build_anchors.py      ->  data/trails/<trail>/anchors.json        吸附到路线上，得到里程
+(下载 Census 州界)    ->  data/raw/cb_2023_us_state_500k.zip       所有路线共用
+build_states.py       ->  data/trails/<trail>/states.json, state_borders.geojson
+make_placeholder.py   ->  AT 占位数据（直线连接约 58 个航点，仅供试用）
 ```
 
-官方总长默认 2197.9 英里（ATC 2026 年数据），可用 `--official-miles` 修改。几何长度与官方长度的比例用来缩放里程；如果你手上有可靠的里程标记，可以用 `--calibration` 传入分段校准。
+**里程怎么来的。** AT 没有官方里程标数据，所以按几何长度与官方总长（2197.9 英里，ATC 2026 年数据，可用 `--official-miles` 修改）的比例整体缩放。PCT 则由 `fetch_centerline.py` 同时下载 PCTA 官方的半英里里程标（5311 个点），`build_route.py` 会自动用它们校准：每个里程标所在位置的里程钉死为官方数字，中间线性插值，总长正好是 PCTA 的 2655.84 英里。事后拿里程标反查，中位偏差不到 0.001 英里，99% 在 0.006 英里以内；最差的一个（0.11 英里，第 175.5 英里附近）是里程标恰好夹在之字形山路的两段折返之间、离另一段更近。任何路线都可以用 `--calibration` 传入自己的里程标，或用 `--no-calibration` 跳过校准。
 
 **为什么多了 `order_centerline.py` 这一步：** NPS 的 ANST_Centerline 图层不是一条排好序的线，而是 20 多年里不同年份、不同 GPS 设备测量的近 3000 段独立线段，段与段之间经常有几米到几十米的空隙（不是精确首尾相连）。早期直接把这些段丢给 `build_route.py` 自带的"贪心找最近点拼接"逻辑，会被这些空隙和个别测量伪迹（比如重复记录的单点、和主线无关的小连接段）带偏，拼出一条长达 3049 英里、结尾在离 Katahdin 890 英里外的错误路线。`order_centerline.py` 用更稳的办法解决：先按官方 `Alt_Name` 字段剔除 Bartram Trail、Benton MacKaye Trail 这类共线的旁道；再用模糊匹配（容差约 80 米）把本该相连但有小空隙的线段拼起来，比 shapely 的精确端点匹配更宽容；最后按 Springer→Katahdin 方向做全局排序拼接，丢弃拼接产生的孤立伪迹点。目前跑出来的结果：拼接后总长 2158 英里，起点离 Springer 0.01 英里、终点离 Katahdin 0.01 英里以内，连接处最大空隙 2.5 英里（真实存在、未被测量覆盖的路段，比如公路穿越点）。
 
@@ -80,31 +83,39 @@ make_placeholder.py   ->  占位数据（直线连接约 58 个航点，仅供�
 
 ```bash
 pip install shapely numpy pyshp
-
-python3 scripts/fetch_centerline.py
-python3 scripts/order_centerline.py data/raw/centerline.geojson        # 拼接成一条有序的线
-python3 scripts/build_route.py data/raw/centerline_ordered.geojson --inspect   # 先看看数据长什么样
-python3 scripts/build_route.py data/raw/centerline_ordered.geojson -o data/trails/AT/route.json
-
-python3 scripts/fetch_osm_pois.py
-python3 scripts/build_anchors.py data/raw/osm_pois.geojson
-
 # 下载 https://www2.census.gov/geo/tiger/GENZ2023/shp/cb_2023_us_state_500k.zip 到 data/raw/
+
+# AT
+python3 scripts/fetch_centerline.py
+python3 scripts/order_centerline.py data/raw/AT/centerline.geojson        # 拼接成一条有序的线
+python3 scripts/build_route.py data/raw/AT/centerline_ordered.geojson --inspect   # 先看看数据长什么样
+python3 scripts/build_route.py data/raw/AT/centerline_ordered.geojson
+python3 scripts/fetch_osm_pois.py
+python3 scripts/build_anchors.py data/raw/AT/osm_pois.geojson
 python3 scripts/build_states.py data/raw/cb_2023_us_state_500k.zip --min-run 0.8
+
+# PCT（本来就是一条排好序的线，不需要拼接）
+python3 scripts/fetch_centerline.py --trail PCT
+python3 scripts/build_route.py --trail PCT data/raw/PCT/centerline.geojson
+python3 scripts/fetch_osm_pois.py --trail PCT
+python3 scripts/build_anchors.py --trail PCT data/raw/PCT/osm_pois.geojson
+python3 scripts/build_states.py --trail PCT data/raw/cb_2023_us_state_500k.zip
 ```
 
-`build_route.py` 会检查路线是否从 Springer Mountain 出发、到 Katahdin 结束，并报告拼接时的缺口和长度偏差。看到 WARNING 先别忽略——不过用了 `order_centerline.py` 之后应该不会再有这些警告了。
+`build_route.py` 会检查路线是否从该路线的起点出发、到终点结束（AT 是 Springer Mountain 和 Katahdin，PCT 是南北两端的界碑），并报告拼接时的缺口和长度偏差。看到 WARNING 先别忽略——不过 AT 用了 `order_centerline.py` 之后、以及 PCT，都不应该出现这些警告。
 
 `fetch_osm_pois.py` 用的是公共 Overpass API，请求多了会被限流（HTTP 429）。如果整条命令跑到一半失败，直接重新运行 `fetch_osm_pois.py` 即可（默认按 40 英里分段请求，重试很快）；网络不稳定时可以加 `--chunk-miles` 调大分段、减少请求次数。
 
-`build_states.py` 的 `--min-run` 控制"州界噪音"的平滑程度：AT 沿北卡/田纳西州界来回穿插约 200 英里、沿弗吉尼亚/西弗吉尼亚州界也有类似路段，默认 0.1 英里的平滑力度会在这些地方切出上百个碎片区间；调到 0.8 英里左右能把弗吉尼亚/西弗吉尼亚收敛到几段真实的跨州（在 Harpers Ferry 附近），北卡/田纳西那 200 英里本来就是真实的反复穿插，切多细都不算错——不管切成多少段，`js/stats.js` 都会把同一个州的里程加总成一个数字，不影响显示。默认按 14 个州分别显示，想合并成一行的话在 `js/config.js` 的 `stateGroups` 里加，例如 `[['NC', 'TN']]`。
+`build_states.py` 的 `--min-run` 控制"州界噪音"的平滑程度：AT 沿北卡/田纳西州界来回穿插约 200 英里、沿弗吉尼亚/西弗吉尼亚州界也有类似路段，默认 0.1 英里的平滑力度会在这些地方切出上百个碎片区间；调到 0.8 英里左右能把弗吉尼亚/西弗吉尼亚收敛到几段真实的跨州（在 Harpers Ferry 附近），北卡/田纳西那 200 英里本来就是真实的反复穿插，切多细都不算错——不管切成多少段，`js/stats.js` 都会把同一个州的里程加总成一个数字，不影响显示。PCT 没有这种情况：它每条州界只穿过一次（加州 1693.4 / 俄勒冈 456.9 / 华盛顿 505.6 英里），用默认值就行。默认按州分别显示，想合并成一行的话在 `js/config.js` 的 `stateGroups` 里加，例如 `[['NC', 'TN']]`。
 
 ## 数据来源与许可
 
 - **步道中心线**（`data/trails/AT/route.json` 的原始输入）：National Park Service Appalachian National Scenic Trail 与 Appalachian Trail Conservancy 联合维护的 `ANST_Centerline` 图层（ArcGIS Online 公开图层）。图层自带的版权声明是 `National Park Service Appalachian National Scenic Trail & Appalachian Trail Conservancy, 2023`，附带的说明是"仅供一般参考、不是法律文件，NPS / USDA Forest Service / ATC 及合作方不对准确性、可靠性或完整性做任何明示或暗示的保证"——这是免责声明，不是一份正式的可复用许可（既没写公有领域，也没写具体的转载条款）。因为版权方里包含 ATC 这个非营利机构（不是纯联邦政府作品），不能简单当作 public domain。本项目按上面那行原文署名使用；如果你打算更大范围地重新分发这份几何数据，建议自己联系 ATC 确认。
 - **官方总里程**（默认 2197.9 英里）：ATC 每年发布的官方数据，当前用的是 2026 年的数字，见 `build_route.py --official-miles`。
-- **地名兴趣点**（`data/trails/AT/anchors.json` 的庇护所、垭口、村镇）：来自 OpenStreetMap，遵循 [ODbL](https://opendatacommons.org/licenses/odbl/) 协议，使用需署名 "© OpenStreetMap contributors"。
-- **州界**（`data/trails/AT/states.json`、`data/trails/AT/state_borders.geojson`）：美国人口普查局（Census Bureau）Cartographic Boundary File，属美国联邦政府作品，公有领域（Public Domain），没有版权限制。
+- **PCT 中心线与里程标**（`data/trails/PCT/route.json` 的原始输入）：Pacific Crest Trail Association 的 `PCTA_Centerline` 和 `PCT_Mile_Markers_2026` 图层（ArcGIS Online，2026 年 1 月版）。许可是 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)——写在图层自带的 `licenseInfo` 字段里，PCTA 的 [PCT Data](https://www.pcta.org/discover-the-trail/maps/pct-data/) 页面也写明该页提供的全部数据都适用。可以自由使用、分享、修改（包括商用），只要署名 Pacific Crest Trail Association；本项目署名为 "Pacific Crest Trail Association, 2026 (CC BY 4.0)"。PCTA 的其他图层（山口、补给小镇）没有列在那个页面上，也没有许可说明，所以不用。
+- **PCT 官方总长**（2655.84 英里）：PCTA 2026 年 1 月的数字，出自同一页面。
+- **地名兴趣点**（各路线 `anchors.json` 里的庇护所、垭口、营地）：来自 OpenStreetMap，遵循 [ODbL](https://opendatacommons.org/licenses/odbl/) 协议，使用需署名 "© OpenStreetMap contributors"。
+- **州界**（各路线的 `states.json`、`state_borders.geojson`）：美国人口普查局（Census Bureau）Cartographic Boundary File，属美国联邦政府作品，公有领域（Public Domain），没有版权限制。
 - **地图底图**：Mapbox（`mapStyle` 见 `js/config.js`），页面右下角会自动显示 Mapbox 和 OpenStreetMap 的署名，遵循 Mapbox 自己的服务条款。
 
 ## 开发

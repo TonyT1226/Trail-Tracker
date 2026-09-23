@@ -2,16 +2,17 @@
 """Work out which state each mile of the route is in, and extract state borders.
 
 Inputs : a US state boundary file (Census cartographic boundary, .zip/.shp/.geojson)
-         and data/trails/AT/route.json
-Outputs: data/trails/AT/states.json          state -> mile ranges (used for per-state progress)
-         data/trails/AT/state_borders.geojson dashed border lines between states (drawn on the map)
+         and data/trails/<trail>/route.json
+Outputs: data/trails/<trail>/states.json          state -> mile ranges (used for per-state progress)
+         data/trails/<trail>/state_borders.geojson dashed border lines between states (drawn on the map)
 
 Where the trail hugs a state line (Smokies on the NC/TN line, parts of VA/WV) the
 state can flip back and forth; the split there is only as accurate as the boundary
 file. The web app can merge such states (see stateGroups in js/config.js).
 
 Usage:
-    python scripts/build_states.py data/raw/cb_2023_us_state_500k.zip
+    python scripts/build_states.py data/raw/cb_2023_us_state_500k.zip --min-run 0.8
+    python scripts/build_states.py --trail PCT data/raw/cb_2023_us_state_500k.zip
 """
 from __future__ import annotations
 
@@ -24,8 +25,8 @@ from shapely.ops import linemerge
 from shapely.prepared import prep
 
 from atlib import AT_STATES, PipelineError, load_route, write_json
+from trail_profiles import add_trail_arg, get_profile
 
-NAME_TO_CODE = {name: code for code, name in AT_STATES}
 ABBR_KEYS = ("STUSPS", "STATE_ABBR", "stusps", "postal", "abbr", "code")
 NAME_KEYS = ("NAME", "name", "STATE_NAME")
 
@@ -46,37 +47,38 @@ def read_shapes(path):
             yield ft.get("properties") or {}, shape(ft["geometry"])
 
 
-def state_code(props):
+def state_code(props, states=AT_STATES):
     for k in ABBR_KEYS:
         v = props.get(k)
         if isinstance(v, str) and len(v) == 2 and v.isalpha():
             return v.upper()
+    name_to_code = {name: code for code, name in states}
     for k in NAME_KEYS:
         v = props.get(k)
-        if isinstance(v, str) and v in NAME_TO_CODE:
-            return NAME_TO_CODE[v]
+        if isinstance(v, str) and v in name_to_code:
+            return name_to_code[v]
     return None
 
 
-def load_states(path):
+def load_states(path, states=AT_STATES):
     shapes = {}
     for props, geom in read_shapes(path):
-        code = state_code(props)
+        code = state_code(props, states)
         if code:
             shapes[code] = geom
-    missing = [c for c, _ in AT_STATES if c not in shapes]
+    missing = [c for c, _ in states if c not in shapes]
     if missing:
-        raise PipelineError(f"boundary file is missing AT states: {', '.join(missing)}")
+        raise PipelineError(f"boundary file is missing trail states: {', '.join(missing)}")
     return shapes
 
 
 # ---------------------------------------------------------------- locating
 
 class StateLocator:
-    """Which of the 14 AT states contains a point (nearest state if it falls in none)."""
+    """Which of the trail's states contains a point (nearest state if it falls in none)."""
 
-    def __init__(self, shapes):
-        self.items = [(c, prep(shapes[c]), shapes[c]) for c, _ in AT_STATES if c in shapes]
+    def __init__(self, shapes, states=AT_STATES):
+        self.items = [(c, prep(shapes[c]), shapes[c]) for c, _ in states if c in shapes]
         self.last = 0
 
     def __call__(self, lonlat):
@@ -140,10 +142,10 @@ def smooth(runs, min_len):
             return runs
 
 
-def build_state_ranges(coords, miles, shapes, min_run=0.1, log=print):
-    runs = smooth(compute_runs(coords, miles, StateLocator(shapes)), min_run)
+def build_state_ranges(coords, miles, shapes, min_run=0.1, log=print, states=AT_STATES):
+    runs = smooth(compute_runs(coords, miles, StateLocator(shapes, states)), min_run)
     out = {}
-    for code, name in AT_STATES:
+    for code, name in states:
         ranges = [[round(a, 3), round(b, 3)] for c, a, b in runs if c == code]
         if ranges:
             out[code] = {"name": name, "ranges": ranges,
@@ -152,7 +154,7 @@ def build_state_ranges(coords, miles, shapes, min_run=0.1, log=print):
     for code, s in out.items():
         log(f"  {code}   {s['total']:8.1f}   {len(s['ranges'])}")
     log(f"  sum {sum(s['total'] for s in out.values()):8.1f}  (route length {miles[-1]:.1f})")
-    return {"order": [c for c, _ in AT_STATES if c in out], "states": out}
+    return {"order": [c for c, _ in states if c in out], "states": out}
 
 
 # ---------------------------------------------------------------- borders
@@ -175,9 +177,9 @@ def _round(obj, nd=4):
     return obj
 
 
-def build_borders(shapes, simplify_deg=0.002):
-    """Lines shared between an AT state and any neighbour (no coastlines)."""
-    at_all = [c for c, _ in AT_STATES]
+def build_borders(shapes, simplify_deg=0.002, states=AT_STATES):
+    """Lines shared between a trail state and any neighbour (no coastlines)."""
+    at_all = [c for c, _ in states]
     lines = []
     for a in (c for c in at_all if c in shapes):
         for b in sorted(shapes):
@@ -198,22 +200,26 @@ def build_borders(shapes, simplify_deg=0.002):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("states", help="state boundary file (.zip/.shp/.geojson)")
-    ap.add_argument("--route", default="data/trails/AT/route.json")
-    ap.add_argument("--out-states", default="data/trails/AT/states.json")
-    ap.add_argument("--out-borders", default="data/trails/AT/state_borders.geojson")
+    add_trail_arg(ap)
+    ap.add_argument("--route", help="default: data/trails/<trail>/route.json")
+    ap.add_argument("--out-states", help="default: data/trails/<trail>/states.json")
+    ap.add_argument("--out-borders", help="default: data/trails/<trail>/state_borders.geojson")
     ap.add_argument("--min-run", type=float, default=0.1,
                     help="absorb same-state flips shorter than this many miles (default 0.1)")
     args = ap.parse_args()
+    profile = get_profile(args.trail)
+    out_states = args.out_states or profile.out("states.json")
+    out_borders = args.out_borders or profile.out("state_borders.geojson")
     try:
-        _, coords, miles = load_route(args.route)
-        shapes = load_states(args.states)
-        result = build_state_ranges(coords, miles, shapes, args.min_run)
-        write_json(args.out_states, result)
-        print(f"wrote {args.out_states}")
-        borders = build_borders(shapes)
+        _, coords, miles = load_route(args.route or profile.out("route.json"))
+        shapes = load_states(args.states, profile.states)
+        result = build_state_ranges(coords, miles, shapes, args.min_run, states=profile.states)
+        write_json(out_states, result)
+        print(f"wrote {out_states}")
+        borders = build_borders(shapes, states=profile.states)
         if borders:
-            size = write_json(args.out_borders, borders)
-            print(f"wrote {args.out_borders} ({size / 1024:.0f} KB)")
+            size = write_json(out_borders, borders)
+            print(f"wrote {out_borders} ({size / 1024:.0f} KB)")
         else:
             print("warning: no shared borders found; the map will use Mapbox's own state lines")
         return 0

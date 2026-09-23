@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Fetch shelters, campsites, mountain gaps and towns near the route from OpenStreetMap.
 
-Queries the Overpass API in small bounding boxes along data/trails/AT/route.json (one box per
-~40 route miles) so no single request is heavy. Output is a GeoJSON of points carrying
-the raw OSM tags; build_anchors.py then snaps them to the route and filters them.
+Queries the Overpass API in small bounding boxes along data/trails/<trail>/route.json (one
+box per ~40 route miles) so no single request is heavy. Output is a GeoJSON of points
+carrying the raw OSM tags; build_anchors.py then snaps them to the route and filters them.
 
 Usage:
-    python scripts/fetch_osm_pois.py                 # -> data/raw/osm_pois.geojson
+    python scripts/fetch_osm_pois.py                 # -> data/raw/AT/osm_pois.geojson
+    python scripts/fetch_osm_pois.py --trail PCT     # -> data/raw/PCT/osm_pois.geojson
     python scripts/fetch_osm_pois.py --dry-run       # print the first query only
 
 Data (c) OpenStreetMap contributors, ODbL.
@@ -21,6 +22,7 @@ import urllib.parse
 import urllib.request
 
 from atlib import load_route, write_json
+from trail_profiles import add_trail_arg, get_profile
 
 ENDPOINT = "https://overpass-api.de/api/interpreter"
 PAD_DEG = 0.06   # ~4-5 miles around the route so off-trail towns are included
@@ -70,13 +72,16 @@ def post(query, retries=4):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--route", default="data/trails/AT/route.json")
-    ap.add_argument("-o", "--output", default="data/raw/osm_pois.geojson")
+    add_trail_arg(ap)
+    ap.add_argument("--route", help="default: data/trails/<trail>/route.json")
+    ap.add_argument("-o", "--output", help="default: data/raw/<trail>/osm_pois.geojson")
     ap.add_argument("--chunk-miles", type=float, default=40.0)
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
+    profile = get_profile(args.trail)
+    args.output = args.output or profile.raw("osm_pois.geojson")
 
-    _, coords, miles = load_route(args.route)
+    _, coords, miles = load_route(args.route or profile.out("route.json"))
     boxes = chunk_bboxes(coords, miles, args.chunk_miles)
     print(f"{len(boxes)} bounding boxes along the route")
     if args.dry_run:
@@ -100,7 +105,7 @@ def main():
 
     size = write_json(args.output, {"type": "FeatureCollection", "features": features})
     print(f"wrote {args.output} ({size / 1024:.0f} KB)")
-    print("next: python scripts/build_anchors.py", args.output)
+    print(f"next: python scripts/build_anchors.py --trail {profile.id}", args.output)
     return 0
 
 

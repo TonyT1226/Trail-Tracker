@@ -18,7 +18,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 from atlib import KATAHDIN, SPRINGER, PipelineError, cumulative_miles, haversine_mi, snap  # noqa: E402
 from build_anchors import build_anchors  # noqa: E402
 from build_route import build_route, chain, rdp_indices  # noqa: E402
-from build_states import build_borders, build_state_ranges  # noqa: E402
+from build_states import build_borders, build_state_ranges, state_code  # noqa: E402
+from fetch_centerline import markers_to_calibration  # noqa: E402
+from trail_profiles import PCT, PROFILES  # noqa: E402
 
 quiet = lambda *a, **k: None  # noqa: E731
 
@@ -172,6 +174,64 @@ class StateTests(unittest.TestCase):
                 on_ga_nc = abs(lat - 35.2) < 1e-6 and -85 - 1e-6 <= lon <= -83 + 1e-6
                 on_tn_line = abs(lon + 83) < 1e-6
                 self.assertTrue(on_ga_nc or on_tn_line, (lon, lat))
+
+
+class ProfileTests(unittest.TestCase):
+    """The same scripts, pointed at another trail through its profile."""
+
+    def pct_line(self, n=2000):
+        t = np.linspace(0, 1, n)
+        lon = PCT.start[0] + (PCT.end[0] - PCT.start[0]) * t + 0.3 * np.sin(t * 40) * np.sin(t * math.pi)
+        lat = PCT.start[1] + (PCT.end[1] - PCT.start[1]) * t
+        return list(zip(lon.tolist(), lat.tolist()))
+
+    def test_profiles_have_distinct_output_folders(self):
+        self.assertEqual(PROFILES["AT"].out("route.json"), os.path.join("data", "trails", "AT", "route.json"))
+        self.assertEqual(PROFILES["PCT"].raw("mile_markers.json"), os.path.join("data", "raw", "PCT", "mile_markers.json"))
+
+    def test_pct_route_checks_its_own_termini(self):
+        pts = self.pct_line()
+        route = build_route(as_features([pts[::-1]]), official_miles=PCT.official_miles, log=quiet, profile=PCT)
+        self.assertEqual(route["name"], "Pacific Crest Trail")
+        self.assertLess(haversine_mi(*route["coords"][0], *PCT.start), 0.1)   # reversed input is re-oriented
+        self.assertAlmostEqual(route["totalMiles"], PCT.official_miles, places=1)
+        with self.assertRaises(PipelineError):                                 # the AT profile rejects it
+            build_route(as_features([pts]), log=quiet)
+
+    def test_calibration_with_many_markers(self):
+        pts = self.pct_line()
+        raw = cumulative_miles(pts)
+        # markers every ~50 raw miles, whose official miles run 1% ahead of the geometry
+        idx = list(range(40, len(pts) - 40, 40))
+        cal = [{"name": str(i), "lon": pts[i][0], "lat": pts[i][1], "mile": float(raw[i]) * 1.01} for i in idx]
+        official = float(raw[-1]) * 1.01
+        route = build_route(as_features([pts]), official_miles=official, tolerance_m=1,
+                            cal_points=cal, log=quiet, profile=PCT)
+        coords, miles = np.asarray(route["coords"]), np.asarray(route["miles"])
+        for c in cal[::7]:
+            m, _ = snap(coords, miles, c["lon"], c["lat"])
+            self.assertAlmostEqual(m, c["mile"], delta=0.05)
+
+    def test_pct_anchor_termini_and_states(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            coords = [list(PCT.start), list(PCT.end)]
+            path = os.path.join(tmp, "route.json")
+            with open(path, "w") as f:
+                json.dump({"coords": coords, "miles": [float(m) for m in cumulative_miles(coords)]}, f)
+            names = [a["name"] for a in build_anchors([], path, log=quiet, profile=PCT)["anchors"]]
+        self.assertEqual(names, ["Southern Terminus", "Northern Terminus"])
+        self.assertEqual(state_code({"NAME": "Oregon"}, PCT.states), "OR")
+        self.assertIsNone(state_code({"NAME": "Oregon"}))                      # not an AT state
+
+    def test_markers_to_calibration_skips_empty_markers(self):
+        feats = [
+            {"geometry": {"type": "Point", "coordinates": [-120.8, 48.99]}, "properties": {"Mile": 2655}},
+            {"geometry": None, "properties": {"Mile": 2660}},                  # past the terminus, no location
+            {"geometry": {"type": "Point", "coordinates": [-116.47, 32.6]}, "properties": {"Mile": 0.5}},
+        ]
+        out = markers_to_calibration(feats, "PCT")
+        self.assertEqual([c["mile"] for c in out], [0.5, 2655.0])
+        self.assertEqual(out[0]["name"], "PCT mile 0.5")
 
 
 if __name__ == "__main__":
