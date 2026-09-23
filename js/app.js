@@ -4,6 +4,7 @@ import { merge, total } from './intervals.js';
 import * as store from './store.js';
 import { stateProgress, summarize } from './stats.js';
 import { createMapView } from './map.js';
+import { loadCatalog, localized, pickTrail, getSavedTrailId, saveTrailId } from './trails.js';
 import { t, getLang, setLang, getUnit, setUnit, KM_PER_MI, STATE_NAMES } from './strings.js';
 
 const TOKEN_KEY = 'at-tracker:token';
@@ -17,10 +18,13 @@ const distValue = (miles) => (getUnit() === 'km' ? miles * KM_PER_MI : miles);
 const dist = (miles) => `${fmt(distValue(miles))} ${t(getUnit() === 'km' ? 'unitKm' : 'unitMi')}`;
 
 const app = {
+  catalog: [],        // every trail listed in data/trails/index.json
+  trail: null,        // the one on screen
   route: null,
   anchors: [],
   statesData: null,
-  hikes: [],
+  hikes: [],          // activities on this trail
+  otherHikes: [],     // activities on other trails: kept, saved and exported untouched
   editingId: null,
   pickTarget: null,
   view: null,
@@ -88,6 +92,10 @@ function wireSwitches() {
     const btn = ev.target.closest('button[data-lang]');
     if (!btn || btn.dataset.lang === getLang()) return;
     setLang(btn.dataset.lang);
+    location.reload();
+  });
+  $('#trailSelect').addEventListener('change', (ev) => {
+    saveTrailId(ev.target.value);
     location.reload();
   });
   $('#unitSwitch').addEventListener('click', (ev) => {
@@ -159,7 +167,7 @@ function renderStates(merged) {
   const list = $('#states');
   list.replaceChildren();
   for (const r of stateProgress(merged, app.statesData, CONFIG.stateGroups)) {
-    const name = r.codes.map((c) => names[c] || c).join(' / ');
+    const name = r.codes.map((c) => names[c] || app.statesData.states[c]?.name || c).join(' / ');
     const fill = el('span', { class: 'fill' });
     fill.style.width = `${r.pct}%`;
     const done = r.pct >= 99.95;
@@ -230,10 +238,11 @@ function updatePreview() {
 
 // ---------------------------------------------------------------- state changes
 
+// `hikes` is this trail's full list; other trails' activities ride along unchanged.
 function commit(hikes) {
   app.hikes = hikes;
   try {
-    store.save(hikes);
+    store.save([...app.otherHikes, ...hikes]);
   } catch {
     flash(t('saveFailedPrivateMode'), true);
   }
@@ -260,6 +269,7 @@ function submitForm(ev) {
     if (Math.abs(a.mile - b.mile) < 0.05) throw new Error(t('sameSpot'));
     const hike = store.normalizeActivity({
       id: app.editingId || undefined,
+      trailId: app.trail.id,
       date: $('#fDate').value,
       range: { from: a.mile, to: b.mile },
       fromName: a.name,
@@ -377,24 +387,51 @@ function tokenPrompt(reason) {
   );
 }
 
+// ---------------------------------------------------------------- trails
+
+function splitByTrail(activities) {
+  app.hikes = activities.filter((h) => h.trailId === app.trail.id);
+  app.otherHikes = activities.filter((h) => h.trailId !== app.trail.id);
+}
+
+function renderTrailHeader() {
+  const { name } = app.trail;
+  const lang = getLang();
+  document.title = `${name} · ${t('title')}`;
+  $('#trailName').textContent = name;
+  $('#trailSubtitle').textContent = localized(app.trail.subtitle, lang);
+  $('#map').setAttribute('aria-label', t('mapAriaLabel', name));
+  $('#credit').textContent = [t('localOnlyNote'), localized(app.trail.credit, lang)].filter(Boolean).join(' ');
+  // The picker only appears once there is more than one trail to pick from.
+  const select = $('#trailSelect');
+  select.replaceChildren(...app.catalog.map((tr) =>
+    el('option', { value: tr.id, text: tr.shortName || tr.id, title: tr.name, selected: tr.id === app.trail.id })));
+  select.hidden = app.catalog.length < 2;
+}
+
 // ---------------------------------------------------------------- start
 
 export async function start() {
   applyStaticI18n();
   wireSwitches();
   try {
+    app.catalog = await loadCatalog(CONFIG.data.trails, (url) => getJSON(url));
+    app.trail = pickTrail(app.catalog, getSavedTrailId());
+    const { urls } = app.trail;
+    const optional = (url) => (url ? getJSON(url, true) : null);
     const [routeData, anchorData, statesData, seed] = await Promise.all([
-      getJSON(CONFIG.data.route),
-      getJSON(CONFIG.data.anchors, true),
-      getJSON(CONFIG.data.states, true),
+      getJSON(urls.route),
+      optional(urls.anchors),
+      optional(urls.states),
       getJSON(CONFIG.data.seedHikes, true),
     ]);
     app.route = new Route(routeData);
     app.anchors = anchorData?.anchors ?? [];
     app.statesData = statesData;
     const stored = store.load();
-    app.hikes = stored ?? (seed ? store.parseImport(JSON.stringify(seed)) : []);
+    splitByTrail(stored ?? (seed ? store.parseImport(JSON.stringify(seed)) : []));
 
+    renderTrailHeader();
     $('#placeholderBanner').hidden = !routeData.placeholder;
     $('#totalMi').textContent = dist(app.route.length);
     $('#anchorList').replaceChildren(...app.anchors.map((a) =>
@@ -415,8 +452,9 @@ export async function start() {
   $('#hikes').addEventListener('click', onHikeClick);
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') endPick(); });
   $('#exportBtn').addEventListener('click', () => {
-    const url = URL.createObjectURL(new Blob([store.serialize(app.hikes)], { type: 'application/json' }));
-    const a = el('a', { href: url, download: `at-hikes-${today()}.json` });
+    const all = [...app.otherHikes, ...app.hikes];
+    const url = URL.createObjectURL(new Blob([store.serialize(all)], { type: 'application/json' }));
+    const a = el('a', { href: url, download: `trail-hikes-${today()}.json` });
     document.body.append(a);
     a.click();
     a.remove();
@@ -429,7 +467,8 @@ export async function start() {
     try {
       const incoming = store.parseImport(await file.text());
       if (confirm(t('importConfirm', incoming.length))) {
-        commit(store.mergeById(app.hikes, incoming));
+        splitByTrail(store.mergeById([...app.otherHikes, ...app.hikes], incoming));
+        commit(app.hikes);
         flash(t('importedFlash', incoming.length));
       }
     } catch (e) {
@@ -451,7 +490,7 @@ export async function start() {
       style: CONFIG.mapStyle,
       route: app.route,
       anchors: app.anchors,
-      bordersUrl: CONFIG.data.borders,
+      bordersUrl: app.trail.urls.borders,
       container: 'map',
       unit: getUnit(),
       formatMile: (mile) => t('mapPopupMile', dist(mile)),

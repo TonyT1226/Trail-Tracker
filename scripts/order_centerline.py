@@ -30,7 +30,7 @@ This script fixes that in three steps:
 
 Usage:
     python scripts/order_centerline.py data/raw/centerline.geojson
-    python scripts/build_route.py data/raw/centerline_ordered.geojson -o data/route.json
+    python scripts/build_route.py data/raw/centerline_ordered.geojson -o data/trails/AT/route.json
 """
 from __future__ import annotations
 
@@ -292,7 +292,7 @@ def main():
     }
     size = write_json(args.output, out)
     print(f"wrote {args.output} ({size / 1024 / 1024:.1f} MB)")
-    print("next: python scripts/build_route.py", args.output, "-o data/route.json")
+    print("next: python scripts/build_route.py", args.output, "-o data/trails/AT/route.json")
     return 0
 
 

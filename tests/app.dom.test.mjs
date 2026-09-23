@@ -58,7 +58,7 @@ define('fetch', async (url) => {
   return { ok: true, status: 200, json: async () => JSON.parse(fs.readFileSync(file, 'utf8')) };
 });
 
-const anchors = JSON.parse(fs.readFileSync(path.join(root, 'data/anchors.json'), 'utf8')).anchors;
+const anchors = JSON.parse(fs.readFileSync(path.join(root, 'data/trails/AT/anchors.json'), 'utf8')).anchors;
 const mileOf = (name) => anchors.find((a) => a.name === name).mile;
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];

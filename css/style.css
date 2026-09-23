@@ -60,7 +60,7 @@ body {
 
 /* ---------------------------------------------------------------- type */
 
-.head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.head-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px; }
 
 h1 {
   margin: 0;
@@ -68,7 +68,20 @@ h1 {
   letter-spacing: 0.01em;
 }
 
-.switches { display: flex; gap: 6px; flex: none; }
+/* Trail picker: sits with the language/unit switches, only shown with 2+ trails. */
+.trail-select {
+  padding: 4px 22px 4px 8px;
+  font: 600 12px/1.5 var(--font-body);
+  color: var(--ink);
+  background: var(--blaze) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%231b2a26' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 7px center;
+  border: 1px solid var(--blaze);
+  border-radius: 6px;
+  appearance: none;
+  cursor: pointer;
+}
+.trail-select:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+.switches { display: flex; gap: 6px; flex: none; margin-left: auto; }
 .switch { display: flex; border: 1px solid var(--pine-line); border-radius: 6px; overflow: hidden; }
 .switch button {
   padding: 4px 8px;

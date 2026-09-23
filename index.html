@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title data-i18n="title">AT Progress Tracker</title>
+  <title data-i18n="title">Trail Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
@@ -13,7 +13,7 @@
 <body>
   <div class="app">
     <main class="map-wrap">
-      <div id="map" role="application" data-i18n-aria="mapAriaLabel" aria-label="Appalachian Trail map"></div>
+      <div id="map" role="application" aria-label="Trail map"></div>
       <div class="map-tools">
         <button type="button" id="fitBtn" data-i18n="fitBtn">View full trail</button>
         <button type="button" id="terrainBtn" aria-pressed="false" data-i18n="terrainBtn">3D terrain</button>
@@ -25,8 +25,9 @@
     <aside class="panel">
       <header class="head">
         <div class="head-row">
-          <h1>Appalachian Trail</h1>
+          <h1 id="trailName">Trail Tracker</h1>
           <div class="switches">
+            <select id="trailSelect" class="trail-select" data-i18n-aria="trailSelectAria" aria-label="Trail" hidden></select>
             <div class="switch" id="langSwitch" role="group" data-i18n-aria="langToggleAria" aria-label="Language">
               <button type="button" data-lang="en">EN</button>
               <button type="button" data-lang="zh">中文</button>
@@ -37,7 +38,7 @@
             </div>
           </div>
         </div>
-        <p class="sub" data-i18n="subtitle">Springer Mountain, GA to Mount Katahdin, ME</p>
+        <p class="sub" id="trailSubtitle"></p>
       </header>
 
       <p class="banner" id="placeholderBanner" data-i18n="placeholderBanner" hidden></p>
@@ -111,7 +112,7 @@
           <button type="button" class="ghost" id="exportBtn" data-i18n="exportBtn">Export JSON</button>
           <label class="ghost btn"><span data-i18n="importBtn">Import JSON</span><input type="file" id="importFile" accept="application/json,.json" hidden></label>
         </div>
-        <p class="credit" id="credit" data-i18n="creditText">Hikes are only saved in this browser -- export a backup before switching devices. Trail: National Park Service Appalachian Trail Park Office &amp; Appalachian Trail Conservancy. Place names: © OpenStreetMap contributors.</p>
+        <p class="credit" id="credit"></p>
       </footer>
     </aside>
   </div>

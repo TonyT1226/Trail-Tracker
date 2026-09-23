@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fetch shelters, campsites, mountain gaps and towns near the route from OpenStreetMap.
 
-Queries the Overpass API in small bounding boxes along data/route.json (one box per
+Queries the Overpass API in small bounding boxes along data/trails/AT/route.json (one box per
 ~40 route miles) so no single request is heavy. Output is a GeoJSON of points carrying
 the raw OSM tags; build_anchors.py then snaps them to the route and filters them.
 
@@ -70,7 +70,7 @@ def post(query, retries=4):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--route", default="data/route.json")
+    ap.add_argument("--route", default="data/trails/AT/route.json")
     ap.add_argument("-o", "--output", default="data/raw/osm_pois.geojson")
     ap.add_argument("--chunk-miles", type=float, default=40.0)
     ap.add_argument("--dry-run", action="store_true")

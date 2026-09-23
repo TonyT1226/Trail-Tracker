@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate PLACEHOLDER data (data/route.json, anchors.json, states.json).
+"""Generate PLACEHOLDER data (data/trails/AT/route.json, anchors.json, states.json).
 
 The "route" is just straight lines between ~58 approximate waypoints; it is NOT the
 real trail. It exists so the dashboard can be opened and tried out before the real
@@ -81,7 +81,7 @@ WAYPOINTS = [
     ("Mount Katahdin", -68.9214, 45.9044, "ME", "terminus"),
 ]
 
-DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
+DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "trails", "AT")
 
 
 def main():

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Build data/anchors.json (named places with mile markers) from a POI GeoJSON.
+"""Build data/trails/AT/anchors.json (named places with mile markers) from a POI GeoJSON.
 
-Every POI is snapped onto data/route.json, so its mile comes from the same
+Every POI is snapped onto data/trails/AT/route.json, so its mile comes from the same
 scale as the route (no need to type in mile markers by hand).
 
 Usage:
@@ -94,8 +94,8 @@ def build_anchors(pois, route_path, log=print):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("pois", help="GeoJSON of points (OSM tags or an explicit 'kind' property)")
-    ap.add_argument("--route", default="data/route.json")
-    ap.add_argument("-o", "--output", default="data/anchors.json")
+    ap.add_argument("--route", default="data/trails/AT/route.json")
+    ap.add_argument("-o", "--output", default="data/trails/AT/anchors.json")
     args = ap.parse_args()
     try:
         with open(args.pois, encoding="utf-8") as f:

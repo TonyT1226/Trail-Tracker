@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "AT",
+  "name": "Appalachian Trail",
+  "shortName": "AT",
+  "color": "#d1246b",
+  "subtitle": {
+    "en": "Springer Mountain, GA to Mount Katahdin, ME",
+    "zh": "乔治亚 Springer Mountain 到缅因 Mount Katahdin"
+  },
+  "credit": {
+    "en": "Trail: National Park Service Appalachian Trail Park Office & Appalachian Trail Conservancy. Place names: © OpenStreetMap contributors.",
+    "zh": "路线：美国国家公园管理局 Appalachian Trail Park Office 与 Appalachian Trail Conservancy。地名：© OpenStreetMap 贡献者。"
+  },
+  "files": {
+    "route": "route.json",
+    "anchors": "anchors.json",
+    "states": "states.json",
+    "borders": "state_borders.geojson"
+  }
+}

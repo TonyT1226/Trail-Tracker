@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build data/route.json from a raw AT centerline GeoJSON.
+"""Build data/trails/AT/route.json from a raw AT centerline GeoJSON.
 
 Pipeline: read LineStrings -> merge/chain into ONE south->north path ->
 stamp cumulative miles (scaled to the official length, optionally calibrated
@@ -7,7 +7,7 @@ against known mile markers) -> simplify -> write compact JSON.
 
 Usage:
     python scripts/build_route.py data/raw/centerline.geojson --inspect
-    python scripts/build_route.py data/raw/centerline.geojson -o data/route.json
+    python scripts/build_route.py data/raw/centerline.geojson -o data/trails/AT/route.json
 """
 from __future__ import annotations
 
@@ -250,7 +250,7 @@ def build_route(features, official_miles=OFFICIAL_MILES_2026, tolerance_m=15.0,
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("input", help="raw centerline GeoJSON")
-    ap.add_argument("-o", "--output", default="data/route.json")
+    ap.add_argument("-o", "--output", default="data/trails/AT/route.json")
     ap.add_argument("--official-miles", type=float, default=OFFICIAL_MILES_2026,
                     help="official total length; 0 keeps the raw geometric miles")
     ap.add_argument("--tolerance", type=float, default=15.0, help="simplify tolerance in metres")

@@ -9,16 +9,14 @@ export const CONFIG = {
   mapStyle: 'mapbox://styles/mapbox/outdoors-v12',
 
   // States to count together in the per-state progress list, e.g. [['NC', 'TN']].
-  // All 14 states are shown separately by default. The trail zig-zags across the
-  // NC/TN line for ~200 miles, so those two totals are each made of many short
-  // alternating segments -- still added up correctly, just not a tidy shape on a map.
+  // Applies to whichever trail is open; every state is shown separately by default.
+  // The AT zig-zags across the NC/TN line for ~200 miles, so those two totals are each
+  // made of many short alternating segments -- still added up correctly, just not a
+  // tidy shape on a map.
   stateGroups: [],
 
   data: {
-    route: 'data/route.json',
-    anchors: 'data/anchors.json',
-    states: 'data/states.json',
-    borders: 'data/state_borders.geojson',
+    trails: 'data/trails/index.json', // which trail folders to load; see js/trails.js
     seedHikes: 'data/hikes.json', // optional: used only when this browser has no saved log yet
   },
 };

@@ -2,9 +2,9 @@
 """Work out which state each mile of the route is in, and extract state borders.
 
 Inputs : a US state boundary file (Census cartographic boundary, .zip/.shp/.geojson)
-         and data/route.json
-Outputs: data/states.json          state -> mile ranges (used for per-state progress)
-         data/state_borders.geojson dashed border lines between states (drawn on the map)
+         and data/trails/AT/route.json
+Outputs: data/trails/AT/states.json          state -> mile ranges (used for per-state progress)
+         data/trails/AT/state_borders.geojson dashed border lines between states (drawn on the map)
 
 Where the trail hugs a state line (Smokies on the NC/TN line, parts of VA/WV) the
 state can flip back and forth; the split there is only as accurate as the boundary
@@ -198,9 +198,9 @@ def build_borders(shapes, simplify_deg=0.002):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("states", help="state boundary file (.zip/.shp/.geojson)")
-    ap.add_argument("--route", default="data/route.json")
-    ap.add_argument("--out-states", default="data/states.json")
-    ap.add_argument("--out-borders", default="data/state_borders.geojson")
+    ap.add_argument("--route", default="data/trails/AT/route.json")
+    ap.add_argument("--out-states", default="data/trails/AT/states.json")
+    ap.add_argument("--out-borders", default="data/trails/AT/state_borders.geojson")
     ap.add_argument("--min-run", type=float, default=0.1,
                     help="absorb same-state flips shorter than this many miles (default 0.1)")
     args = ap.parse_args()
