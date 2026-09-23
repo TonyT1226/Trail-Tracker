@@ -8,6 +8,9 @@
 // subtitle / credit may be a plain string or a { en, zh, ... } object.
 const TRAIL_KEY = 'at-tracker:trail';
 
+// Saved in place of a trail id when the picker is on "All trails" (the overview).
+export const ALL_TRAILS = '*';
+
 // "data/trails/index.json" + "PCT" -> "data/trails/PCT/"
 export const trailFolder = (indexUrl, id) => indexUrl.replace(/[^/]*$/, `${encodeURIComponent(id)}/`);
 

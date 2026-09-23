@@ -2,9 +2,9 @@ import { CONFIG } from './config.js';
 import { Route } from './geo.js';
 import { merge, total } from './intervals.js';
 import * as store from './store.js';
-import { stateProgress, summarize } from './stats.js';
-import { createMapView } from './map.js';
-import { loadCatalog, localized, pickTrail, getSavedTrailId, saveTrailId } from './trails.js';
+import { stateProgress, summarize, summarizeTrails } from './stats.js';
+import { createMapView, createOverviewMap } from './map.js';
+import { ALL_TRAILS, loadCatalog, localized, pickTrail, getSavedTrailId, saveTrailId } from './trails.js';
 import { t, getLang, setLang, getUnit, setUnit, KM_PER_MI, STATE_NAMES } from './strings.js';
 
 const TOKEN_KEY = 'at-tracker:token';
@@ -19,7 +19,8 @@ const dist = (miles) => `${fmt(distValue(miles))} ${t(getUnit() === 'km' ? 'unit
 
 const app = {
   catalog: [],        // every trail listed in data/trails/index.json
-  trail: null,        // the one on screen
+  trail: null,        // the one on screen (null in the overview)
+  overview: null,     // "All trails": [{ trail, route }] for every trail, else null
   route: null,
   anchors: [],
   statesData: null,
@@ -59,13 +60,15 @@ async function getJSON(url, optional = false) {
   return res.json();
 }
 
-let flashTimer;
-function flash(message, isError = false) {
-  const box = $('#formMsg');
+// Messages show next to whatever caused them: '#formMsg' under the hike form, '#toolsMsg'
+// under the export/import buttons (the only place for them in the overview, which has no form).
+const flashTimers = {};
+function flash(message, isError = false, where = '#formMsg') {
+  const box = $(where);
   box.textContent = message;
   box.classList.toggle('err', isError);
-  clearTimeout(flashTimer);
-  if (!isError && message) flashTimer = setTimeout(() => { box.textContent = ''; }, 4000);
+  clearTimeout(flashTimers[where]);
+  if (!isError && message) flashTimers[where] = setTimeout(() => { box.textContent = ''; }, 4000);
 }
 
 // ---------------------------------------------------------------- language / units
@@ -94,9 +97,10 @@ function wireSwitches() {
     setLang(btn.dataset.lang);
     location.reload();
   });
-  $('#trailSelect').addEventListener('change', (ev) => {
-    saveTrailId(ev.target.value);
-    location.reload();
+  $('#trailSelect').addEventListener('change', (ev) => openTrail(ev.target.value));
+  $('#states').addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-trail]');
+    if (btn) openTrail(btn.dataset.trail);
   });
   $('#unitSwitch').addEventListener('click', (ev) => {
     const btn = ev.target.closest('button[data-unit]');
@@ -197,6 +201,10 @@ function hikeRow(h) {
 }
 
 function render() {
+  if (app.overview) {
+    renderOverview();
+    return;
+  }
   const s = summarize(app.hikes, app.route.length);
   $('#doneMi').textContent = fmt(distValue(s.done));
   $('#pct').textContent = `${fmt(s.pct)}%`;
@@ -213,6 +221,44 @@ function render() {
   $('#emptyMsg').hidden = app.hikes.length > 0;
 
   app.view?.setDone(app.route.featuresFor(s.merged));
+}
+
+// "All trails": combined figures at the top, then one row per trail in place of the states.
+function renderOverview() {
+  const s = summarizeTrails(app.overview.map(({ trail, route }) => ({
+    id: trail.id, totalMiles: route.length, hikes: app.hikes.filter((h) => h.trailId === trail.id),
+  })));
+  $('#doneMi').textContent = fmt(distValue(s.done));
+  $('#totalMi').textContent = dist(s.totalMiles);
+  $('#pct').textContent = `${fmt(s.pct)}%`;
+  $('#remainMi').textContent = dist(s.remaining);
+  $('#dayCount').textContent = t('days', s.dayCount);
+  $('#hikeCount').textContent = t('hikesCount', s.hikeCount);
+  $('#lastDate').textContent = s.lastDate ?? '—';
+  renderBlazes(s.pct);
+  $('#blazes').setAttribute('aria-label', t('completedAriaLabel', fmt(s.pct)));
+
+  $('#statesSection').hidden = false;
+  $('#statesTitle').textContent = t('trailsTitle');
+  $('#states').replaceChildren(...app.overview.map(({ trail, route }, i) => {
+    const r = s.perTrail[i];
+    const fill = el('span', { class: 'fill' });
+    fill.style.width = `${r.pct}%`;
+    fill.style.background = trail.color;
+    const swatch = el('span', { class: 'swatch' });
+    swatch.style.background = trail.color;
+    const open = el('button', { type: 'button', class: 'trail-open', 'data-trail': trail.id, 'aria-label': t('openTrailAria', trail.name) },
+      el('div', { class: 'state-head' },
+        el('span', { class: 'state-name' }, swatch, trail.name),
+        el('span', { class: 'state-num', text: `${fmt(distValue(r.done))} / ${fmt(distValue(route.length))} · ${fmt(r.pct)}%` })),
+      el('div', {
+        class: 'track', role: 'progressbar', 'aria-label': trail.name,
+        'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(r.pct)),
+      }, fill));
+    return el('li', { class: 'state' }, open);
+  }));
+
+  app.view?.setDone(Object.fromEntries(app.overview.map(({ trail }, i) => [trail.id, s.perTrail[i].merged])));
 }
 
 function updatePreview() {
@@ -239,12 +285,12 @@ function updatePreview() {
 // ---------------------------------------------------------------- state changes
 
 // `hikes` is this trail's full list; other trails' activities ride along unchanged.
-function commit(hikes) {
+function commit(hikes, msgBox = '#formMsg') {
   app.hikes = hikes;
   try {
     store.save([...app.otherHikes, ...hikes]);
   } catch {
-    flash(t('saveFailedPrivateMode'), true);
+    flash(t('saveFailedPrivateMode'), true, msgBox);
   }
   render();
 }
@@ -390,23 +436,69 @@ function tokenPrompt(reason) {
 // ---------------------------------------------------------------- trails
 
 function splitByTrail(activities) {
+  if (!app.trail) {               // overview: everything is "this view's"
+    app.hikes = activities;
+    app.otherHikes = [];
+    return;
+  }
   app.hikes = activities.filter((h) => h.trailId === app.trail.id);
   app.otherHikes = activities.filter((h) => h.trailId !== app.trail.id);
 }
 
 function renderTrailHeader() {
-  const { name } = app.trail;
   const lang = getLang();
+  const name = app.trail?.name ?? t('allTrails');
+  const shown = app.trail ? [app.trail] : app.catalog;
   document.title = `${name} · ${t('title')}`;
   $('#trailName').textContent = name;
-  $('#trailSubtitle').textContent = localized(app.trail.subtitle, lang);
+  $('#trailSubtitle').textContent = app.trail
+    ? localized(app.trail.subtitle, lang)
+    : t('overviewSubtitle', app.catalog.length);
   $('#map').setAttribute('aria-label', t('mapAriaLabel', name));
-  $('#credit').textContent = [t('localOnlyNote'), localized(app.trail.credit, lang)].filter(Boolean).join(' ');
-  // The picker only appears once there is more than one trail to pick from.
+  $('#credit').textContent = [t('localOnlyNote'), ...shown.map((tr) => localized(tr.credit, lang))].filter(Boolean).join(' ');
+  // The picker only appears once there is more than one trail to pick from; then it also
+  // offers "All trails" first.
   const select = $('#trailSelect');
-  select.replaceChildren(...app.catalog.map((tr) =>
-    el('option', { value: tr.id, text: tr.shortName || tr.id, title: tr.name, selected: tr.id === app.trail.id })));
-  select.hidden = app.catalog.length < 2;
+  const multi = app.catalog.length > 1;
+  select.replaceChildren(
+    ...(multi ? [el('option', { value: ALL_TRAILS, text: t('allTrailsShort'), title: t('allTrails'), selected: !app.trail })] : []),
+    ...app.catalog.map((tr) =>
+      el('option', { value: tr.id, text: tr.shortName || tr.id, title: tr.name, selected: tr.id === app.trail?.id })));
+  select.hidden = !multi;
+  // Logging a hike needs a trail, so the overview swaps the form and log for a pointer.
+  $('#logSection').hidden = !app.trail;
+  $('#hikesSection').hidden = !app.trail;
+  $('#overviewHint').hidden = Boolean(app.trail);
+}
+
+async function loadOverview() {
+  const routes = await Promise.all(app.catalog.map((tr) => getJSON(tr.urls.route)));
+  app.trail = null;
+  app.overview = app.catalog.map((trail, i) => ({ trail, route: new Route(routes[i]) }));
+  $('#placeholderBanner').hidden = !routes.some((r) => r.placeholder);
+}
+
+async function loadTrail(trail) {
+  const { urls } = trail;
+  const optional = (url) => (url ? getJSON(url, true) : null);
+  const [routeData, anchorData, statesData] = await Promise.all([
+    getJSON(urls.route),
+    optional(urls.anchors),
+    optional(urls.states),
+  ]);
+  app.trail = trail;
+  app.route = new Route(routeData);
+  app.anchors = anchorData?.anchors ?? [];
+  app.statesData = statesData;
+  $('#placeholderBanner').hidden = !routeData.placeholder;
+  $('#totalMi').textContent = dist(app.route.length);
+  $('#anchorList').replaceChildren(...app.anchors.map((a) =>
+    el('option', { value: `${a.name} (${a.mile.toFixed(1)})`, label: dist(a.mile) })));
+}
+
+function openTrail(id) {
+  saveTrailId(id);
+  location.reload();
 }
 
 // ---------------------------------------------------------------- start
@@ -416,26 +508,15 @@ export async function start() {
   wireSwitches();
   try {
     app.catalog = await loadCatalog(CONFIG.data.trails, (url) => getJSON(url));
-    app.trail = pickTrail(app.catalog, getSavedTrailId());
-    const { urls } = app.trail;
-    const optional = (url) => (url ? getJSON(url, true) : null);
-    const [routeData, anchorData, statesData, seed] = await Promise.all([
-      getJSON(urls.route),
-      optional(urls.anchors),
-      optional(urls.states),
-      getJSON(CONFIG.data.seedHikes, true),
-    ]);
-    app.route = new Route(routeData);
-    app.anchors = anchorData?.anchors ?? [];
-    app.statesData = statesData;
+    const saved = getSavedTrailId();
+    const seedLoad = getJSON(CONFIG.data.seedHikes, true);
+    if (saved === ALL_TRAILS && app.catalog.length > 1) await loadOverview();
+    else await loadTrail(pickTrail(app.catalog, saved));
+    const seed = await seedLoad;
     const stored = store.load();
     splitByTrail(stored ?? (seed ? store.parseImport(JSON.stringify(seed)) : []));
 
     renderTrailHeader();
-    $('#placeholderBanner').hidden = !routeData.placeholder;
-    $('#totalMi').textContent = dist(app.route.length);
-    $('#anchorList').replaceChildren(...app.anchors.map((a) =>
-      el('option', { value: `${a.name} (${a.mile.toFixed(1)})`, label: dist(a.mile) })));
     $('#fDate').value = today();
     buildBlazes();
   } catch (e) {
@@ -468,12 +549,12 @@ export async function start() {
       const incoming = store.parseImport(await file.text());
       if (confirm(t('importConfirm', incoming.length))) {
         splitByTrail(store.mergeById([...app.otherHikes, ...app.hikes], incoming));
-        commit(app.hikes);
-        const elsewhere = incoming.filter((h) => h.trailId !== app.trail.id).length;
-        flash(t('importedFlash', incoming.length, elsewhere));
+        commit(app.hikes, '#toolsMsg');
+        const elsewhere = app.trail ? incoming.filter((h) => h.trailId !== app.trail.id).length : 0;
+        flash(t('importedFlash', incoming.length, elsewhere), false, '#toolsMsg');
       }
     } catch (e) {
-      flash(e.message, true);
+      flash(e.message, true, '#toolsMsg');
     }
   });
 
@@ -484,6 +565,23 @@ export async function start() {
     showMapMessage(el('p', { text: t('mapScriptMissing') }));
   } else if (!token) {
     tokenPrompt(t('noTokenYet'));
+  } else if (app.overview) {
+    app.view = createOverviewMap({
+      mapboxgl,
+      token,
+      style: CONFIG.mapStyle,
+      trails: app.overview.map(({ trail, route }) => ({ id: trail.id, name: trail.name, color: trail.color, route })),
+      container: 'map',
+      unit: getUnit(),
+      formatPoint: (trail, mile) => t('mapPopupTrailMile', trail.name, dist(mile)),
+      onError: (err) => {
+        if (err?.status === 401 || err?.status === 403) tokenPrompt(t('tokenRejected'));
+      },
+    });
+    $('#fitBtn').addEventListener('click', () => app.view.fit());
+    $('#terrainBtn').addEventListener('click', (ev) => {
+      ev.currentTarget.setAttribute('aria-pressed', String(app.view.toggleTerrain()));
+    });
   } else {
     app.view = createMapView({
       mapboxgl,

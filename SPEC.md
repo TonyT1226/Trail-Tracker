@@ -15,11 +15,11 @@ js/
   trails.js            loads the trail catalog (data/trails/index.json) and each trail's manifest
   strings.js           all user-facing text, English + Chinese, plus the language/unit switches
   app.js               page logic: load data, the form, the hike log, stats
-  map.js               all the Mapbox code lives here (basemap, route, place names, state borders, 3D terrain, click-to-pick)
+  map.js               all the Mapbox code lives here (basemap, route, place names, state borders, 3D terrain, click-to-pick, the all-trails map)
   geo.js               route geometry: point/slice by mile, nearest mile to a click
   intervals.js         mile-range merging (a repeated or overlapping hike is never double-counted)
   store.js             the hike log's storage: localStorage + JSON export/import
-  stats.js             overall and per-state progress
+  stats.js             overall, per-state and all-trails progress
 data/trails/
   index.json           which trail folders to load, in picker order
   AT/                  one folder per trail ("trail package")
@@ -48,6 +48,8 @@ Every trail is a folder under `data/trails/` with a `trail.json` manifest; `data
   "files": { "route": "route.json", "anchors": "anchors.json", "states": "states.json", "borders": "state_borders.geojson" }
 }
 ```
+
+With two or more trails the picker also offers **All** (saved as `*`): the overview loads every trail's `route.json` (nothing else), shows combined totals plus one row per trail in its manifest `color`, and draws every route on one map with each trail's walked miles in that colour. Intervals are merged per trail and only then added up -- miles restart at 0 on every trail, so mile 10 on the AT and mile 10 on the PCT are different places (`summarizeTrails` in `js/stats.js`). Logging needs a trail, so the overview hides the form and hike log; export/import still work there and always cover everything.
 
 Only `files.route` is required; leave out `anchors`/`states`/`borders` and the place-name list, per-state progress and border lines simply don't appear. State names come from `js/strings.js` when it knows the code (for the Chinese translation), otherwise from the `name` in the trail's own `states.json`.
 

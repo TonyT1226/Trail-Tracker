@@ -1,5 +1,6 @@
-// Everything that touches Mapbox GL JS lives here. app.js only calls the small API
-// returned by createMapView(), so the rest of the app works (and is testable) without a map.
+// Everything that touches Mapbox GL JS lives here. app.js only calls the small APIs returned
+// by createMapView() (one trail) and createOverviewMap() (all of them), so the rest of the
+// app works (and is testable) without a map.
 
 const EMPTY = { type: 'FeatureCollection', features: [] };
 const FONT = ['DIN Pro Medium', 'Arial Unicode MS Regular'];
@@ -7,29 +8,55 @@ const COLORS = { base: '#4f5d58', done: '#d1246b', halo: '#ffb703', casing: '#ff
 
 const widthByZoom = (small, large) => ['interpolate', ['linear'], ['zoom'], 4, small, 11, large];
 
-export function createMapView({ mapboxgl, token, style, route, anchors, bordersUrl, container, onPick, onError, unit = 'mi', formatMile }) {
+const line = (id, source, color, width, extra = {}) => ({
+  id,
+  type: 'line',
+  source,
+  layout: { 'line-cap': 'round', 'line-join': 'round' },
+  paint: { 'line-color': color, 'line-width': width, ...extra },
+});
+
+// Shared by both views: the map itself, its controls, and error reporting.
+function baseMap({ mapboxgl, token, style, container, bounds, unit, onError }) {
   mapboxgl.accessToken = token;
-  const map = new mapboxgl.Map({
-    container,
-    style,
-    bounds: route.bounds(),
-    fitBoundsOptions: { padding: 40 },
-  });
+  const map = new mapboxgl.Map({ container, style, bounds, fitBoundsOptions: { padding: 40 } });
   map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
   map.addControl(new mapboxgl.ScaleControl({ unit: unit === 'km' ? 'metric' : 'imperial' }), 'bottom-left');
+  map.on('error', (e) => onError?.(e.error || e));
+  return map;
+}
+
+// Returns a function that flips 3D terrain on/off and reports the new state.
+function terrainToggle(map) {
+  let on = false;
+  return () => {
+    on = !on;
+    if (on) {
+      if (!map.getSource('dem')) {
+        map.addSource('dem', { type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14 });
+      }
+      map.setTerrain({ source: 'dem', exaggeration: 1.4 });
+      map.easeTo({ pitch: 60, duration: 800 });
+    } else {
+      map.setTerrain(null);
+      map.easeTo({ pitch: 0, duration: 800 });
+    }
+    return on;
+  };
+}
+
+// Clicks within ~24 px of a line count as "on" it, whatever the zoom.
+function clickLimitMi(map, lat) {
+  const mPerPx = (78271.517 * Math.cos((lat * Math.PI) / 180)) / 2 ** map.getZoom();
+  return Math.max(0.3, (mPerPx * 24) / 1609.344);
+}
+
+export function createMapView({ mapboxgl, token, style, route, anchors, bordersUrl, container, onPick, onError, unit = 'mi', formatMile }) {
+  const map = baseMap({ mapboxgl, token, style, container, bounds: route.bounds(), unit, onError });
 
   let ready = false;
   let pendingDone = EMPTY;
   let pickMode = false;
-  let terrainOn = false;
-
-  const line = (id, source, color, width, extra = {}) => ({
-    id,
-    type: 'line',
-    source,
-    layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': color, 'line-width': width, ...extra },
-  });
 
   map.on('load', () => {
     map.addSource('route', { type: 'geojson', data: route.asFeature() });
@@ -110,9 +137,7 @@ export function createMapView({ mapboxgl, token, style, route, anchors, bordersU
 
   map.on('click', (e) => {
     const { mile, distMi } = route.nearest(e.lngLat.lng, e.lngLat.lat);
-    const mPerPx = (78271.517 * Math.cos((e.lngLat.lat * Math.PI) / 180)) / 2 ** map.getZoom();
-    const limitMi = Math.max(0.3, (mPerPx * 24) / 1609.344); // ~24 px around the line
-    const hit = distMi <= limitMi;
+    const hit = distMi <= clickLimitMi(map, e.lngLat.lat);
     if (pickMode) {
       onPick?.({ mile, hit });
       return;
@@ -124,8 +149,6 @@ export function createMapView({ mapboxgl, token, style, route, anchors, bordersU
         .addTo(map);
     }
   });
-
-  map.on('error', (e) => onError?.(e.error || e));
 
   return {
     map,
@@ -158,19 +181,65 @@ export function createMapView({ mapboxgl, token, style, route, anchors, bordersU
       pickMode = on;
       map.getCanvas().style.cursor = on ? 'crosshair' : '';
     },
-    toggleTerrain() {
-      terrainOn = !terrainOn;
-      if (terrainOn) {
-        if (!map.getSource('dem')) {
-          map.addSource('dem', { type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14 });
-        }
-        map.setTerrain({ source: 'dem', exaggeration: 1.4 });
-        map.easeTo({ pitch: 60, duration: 800 });
-      } else {
-        map.setTerrain(null);
-        map.easeTo({ pitch: 0, duration: 800 });
-      }
-      return terrainOn;
+    toggleTerrain: terrainToggle(map),
+  };
+}
+
+// Every trail at once: each route as a grey line, with its walked miles drawn over it in
+// that trail's own colour. trails: [{ id, name, color, route }]; setDone takes
+// { [id]: mergedIntervals }.
+export function createOverviewMap({ mapboxgl, token, style, trails, container, onError, unit = 'mi', formatPoint }) {
+  const all = trails.flatMap((tr) => tr.route.bounds());
+  const bounds = [
+    [Math.min(...all.map((p) => p[0])), Math.min(...all.map((p) => p[1]))],
+    [Math.max(...all.map((p) => p[0])), Math.max(...all.map((p) => p[1]))],
+  ];
+  const map = baseMap({ mapboxgl, token, style, container, bounds, unit, onError });
+
+  let ready = false;
+  let pendingDone = EMPTY;
+  const doneFeatures = (byId) => ({
+    type: 'FeatureCollection',
+    features: trails.flatMap((tr) => tr.route.featuresFor(byId[tr.id] || []).features
+      .map((f) => ({ ...f, properties: { color: tr.color } }))),
+  });
+
+  map.on('load', () => {
+    map.addSource('routes', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: trails.map((tr) => tr.route.asFeature()) },
+    });
+    map.addSource('done', { type: 'geojson', data: pendingDone });
+    map.addLayer(line('route-casing', 'routes', COLORS.casing, widthByZoom(3.5, 7), { 'line-opacity': 0.85 }));
+    map.addLayer(line('route-base', 'routes', COLORS.base, widthByZoom(1.5, 3)));
+    map.addLayer(line('done-casing', 'done', COLORS.casing, widthByZoom(5, 9)));
+    map.addLayer(line('done', 'done', ['get', 'color'], widthByZoom(3, 5.5)));
+    ready = true;
+    map.getSource('done').setData(pendingDone);
+  });
+
+  // clicking on a trail says which one it is and where
+  map.on('click', (e) => {
+    const { lng, lat } = e.lngLat;
+    const best = trails
+      .map((tr) => ({ tr, ...tr.route.nearest(lng, lat) }))
+      .sort((a, b) => a.distMi - b.distMi)[0];
+    if (!best || best.distMi > clickLimitMi(map, lat)) return;
+    new mapboxgl.Popup({ closeButton: false, offset: 8 })
+      .setLngLat(best.tr.route.pointAt(best.mile))
+      .setText(formatPoint ? formatPoint(best.tr, best.mile) : `${best.tr.name} ${best.mile.toFixed(1)}`)
+      .addTo(map);
+  });
+
+  return {
+    map,
+    setDone(byId) {
+      pendingDone = doneFeatures(byId);
+      if (ready) map.getSource('done').setData(pendingDone);
     },
+    fit() {
+      map.fitBounds(bounds, { padding: 40, duration: 800, pitch: 0, bearing: 0 });
+    },
+    toggleTerrain: terrainToggle(map),
   };
 }

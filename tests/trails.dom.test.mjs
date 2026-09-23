@@ -80,7 +80,9 @@ test('the saved trail is opened, with a picker listing every trail', () => {
   assert.equal($('#trailSelect').hidden, false);
   assert.equal($('#trailName').textContent, 'Test Trail');
   assert.deepEqual($$('#trailSelect option').map((o) => [o.value, o.textContent]),
-    [['AT', 'AT'], ['TEST', 'TT']]);
+    [['*', 'All'], ['AT', 'AT'], ['TEST', 'TT']]);
+  assert.equal($('#logSection').hidden, false);
+  assert.equal($('#overviewHint').hidden, true);
   assert.equal($('#trailSelect').value, 'TEST');
   assert.equal($('#trailSubtitle').textContent, 'Here to There');
   assert.match($('#credit').textContent, /Test data, public domain\./);
@@ -133,7 +135,7 @@ test('importing hikes from several trails says how many landed on other trails',
   Object.defineProperty(input, 'files', { value: [file], configurable: true });
   input.dispatchEvent(new window.Event('change'));
   await new Promise((r) => setTimeout(r, 20));
-  assert.equal($('#formMsg').textContent, 'Imported 2 hikes (1 on other trails -- switch trails to see it)');
+  assert.equal($('#toolsMsg').textContent, 'Imported 2 hikes (1 on other trails -- switch trails to see it)');
   assert.ok(saved().some((a) => a.id === 'at-2'), 'the AT hike is kept even though it is not shown');
   assert.equal($$('#hikes li').length, 2);   // the remaining TEST hike + the imported one
 });

@@ -11,6 +11,7 @@ A static site for tracking your progress on America's long trails -- the Appalac
 ## What it does
 
 - The full AT or PCT on a map, with real mileage from the official trail data. Switch trails from the top of the page; each keeps its own progress.
+- An "All" overview: every trail on one map, each in its own colour, with combined totals and each trail's percent complete.
 - Log a hike by date and a start/end point -- type a mile number or a place name.
 - Overlapping or repeated hikes are never double-counted.
 - Total miles, percent complete, days hiked, and progress broken down by state.
@@ -21,7 +22,7 @@ A static site for tracking your progress on America's long trails -- the Appalac
 
 1.0 (the Appalachian Trail) is done; 2.0 is in progress:
 
-- **2.0** -- more long trails (the PCT is in), and an overview across all of them (next).
+- **2.0** -- more long trails (the PCT is in), and an overview across all of them (done); next, a guide to adding a trail.
 - **3.0** -- import your own GPX tracks instead of typing in mile ranges by hand.
 - **4.0** -- a native iOS/iPadOS/macOS app.
 

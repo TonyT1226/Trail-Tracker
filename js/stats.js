@@ -16,6 +16,26 @@ export function summarize(hikes, totalMiles) {
   };
 }
 
+// Progress across several trails: [{ id, totalMiles, hikes }] -> combined figures plus one
+// summarize() per trail. Miles restart at 0 on every trail, so intervals are only ever merged
+// within a trail -- mile 10 on the AT and mile 10 on the PCT are different places.
+export function summarizeTrails(trails) {
+  const perTrail = trails.map((tr) => ({ id: tr.id, ...summarize(tr.hikes, tr.totalMiles) }));
+  const totalMiles = trails.reduce((s, tr) => s + tr.totalMiles, 0);
+  const done = perTrail.reduce((s, r) => s + r.done, 0);
+  const dates = [...new Set(trails.flatMap((tr) => tr.hikes.map((h) => h.date)))].sort();
+  return {
+    perTrail,
+    totalMiles,
+    done,
+    remaining: Math.max(totalMiles - done, 0),
+    pct: totalMiles > 0 ? Math.min((done / totalMiles) * 100, 100) : 0,
+    hikeCount: perTrail.reduce((s, r) => s + r.hikeCount, 0),
+    dayCount: dates.length,
+    lastDate: dates.length ? dates[dates.length - 1] : null,
+  };
+}
+
 // One row per state (or per group of states listed together), south to north.
 export function stateProgress(merged, statesData, groups = []) {
   const rows = [];

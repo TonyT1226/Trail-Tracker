@@ -64,7 +64,9 @@
         <ol class="states" id="states"></ol>
       </section>
 
-      <section aria-labelledby="formTitle">
+      <p class="hint" id="overviewHint" data-i18n="overviewHint" hidden></p>
+
+      <section id="logSection" aria-labelledby="formTitle">
         <h2 id="formTitle" data-i18n="formTitle">Log a hike</h2>
         <form id="hikeForm" autocomplete="off" novalidate>
           <label class="field">
@@ -101,7 +103,7 @@
         </form>
       </section>
 
-      <section aria-labelledby="hikesTitle">
+      <section id="hikesSection" aria-labelledby="hikesTitle">
         <h2 id="hikesTitle" data-i18n="hikesTitle">Hike log</h2>
         <ol class="hikes" id="hikes"></ol>
         <p class="empty" id="emptyMsg" data-i18n="emptyMsg">No hikes logged yet. Fill in the form above, or click "Pick" to choose a start and end point on the map.</p>
@@ -112,6 +114,7 @@
           <button type="button" class="ghost" id="exportBtn" data-i18n="exportBtn">Export JSON</button>
           <label class="ghost btn"><span data-i18n="importBtn">Import JSON</span><input type="file" id="importFile" accept="application/json,.json" hidden></label>
         </div>
+        <p class="msg" id="toolsMsg" aria-live="polite"></p>
         <p class="credit" id="credit"></p>
       </footer>
     </aside>

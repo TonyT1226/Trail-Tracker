@@ -132,6 +132,20 @@ h2 {
 
 .states, .hikes { margin: 0; padding: 0; list-style: none; }
 .state { padding: 7px 0; }
+/* overview: each trail row is a button that opens that trail; the bar takes the trail's colour */
+.trail-open {
+  display: block;
+  width: 100%;
+  padding: 6px 0;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+}
+.trail-open .state-head { font-size: 15px; font-weight: 600; }
+.trail-open:hover .state-name { text-decoration: underline; text-underline-offset: 3px; }
+.swatch { display: inline-block; width: 10px; height: 10px; margin-right: 8px; border-radius: 2px; vertical-align: 0; }
+.hint { margin: 26px 0 0; color: var(--moss); font-size: 14px; }
 .state-head { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
 .state-num { color: var(--moss); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .state-done-badge { margin-left: 6px; color: var(--moss); font-size: 12px; }

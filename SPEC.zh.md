@@ -19,7 +19,7 @@ js/
   geo.js               路线几何：按里程取点/切段、找离点击处最近的里程
   intervals.js         里程区间合并（重复、重叠的徒步不会重复计算）
   store.js             徒步记录的存取，浏览器 localStorage + 导入导出 JSON
-  stats.js             总进度和各州进度
+  stats.js             总进度、各州进度和全部路线的合计
 data/trails/
   index.json           要加载哪些路线文件夹，顺序即切换菜单里的顺序
   AT/                  每条路线一个文件夹（"路线数据包"）
@@ -48,6 +48,8 @@ tests/                JS 与 Python 测试
   "files": { "route": "route.json", "anchors": "anchors.json", "states": "states.json", "borders": "state_borders.geojson" }
 }
 ```
+
+路线有两条以上时，切换菜单里还会有 **全部**（保存为 `*`）：总览只加载每条路线的 `route.json`，显示所有路线的合计，外加每条路线一行（颜色取自说明文件里的 `color`），并在同一张地图上画出所有路线、用各自的颜色标出已走部分。里程区间先在每条路线内部合并、再相加——每条路线的里程都从 0 开始，AT 的第 10 英里和 PCT 的第 10 英里是两个地方（见 `js/stats.js` 的 `summarizeTrails`）。记录徒步必须属于某条路线，所以总览里不显示录入表单和记录列表；导出、导入照常可用，永远包含全部记录。
 
 只有 `files.route` 是必须的；不提供 `anchors`/`states`/`borders` 时，地名列表、各州进度、州界虚线就不显示。州名优先用 `js/strings.js` 里的翻译（为了中文显示），没有的话用该路线 `states.json` 里的 `name`。
 

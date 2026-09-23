@@ -50,3 +50,21 @@ test('a finished state reports 100%', () => {
   const rows = stateProgress(merge([[0, 80]]), statesData, []);
   assert.equal(rows[0].pct, 100);
 });
+
+test('summarizeTrails merges within a trail, never across trails', async () => {
+  const { summarizeTrails } = await import('../js/stats.js');
+  const at = [hike(0, 30, '2026-05-01'), hike(20, 40, '2026-05-02')];
+  const pct = [{ ...hike(0, 30, '2026-06-01'), id: 'p' }];     // same miles, different trail
+  const s = summarizeTrails([
+    { id: 'AT', totalMiles: 100, hikes: at },
+    { id: 'PCT', totalMiles: 300, hikes: pct },
+  ]);
+  assert.equal(s.done, 40 + 30);
+  assert.equal(s.totalMiles, 400);
+  assert.equal(s.pct, 17.5);
+  assert.equal(s.remaining, 330);
+  assert.equal(s.hikeCount, 3);
+  assert.equal(s.dayCount, 3);
+  assert.equal(s.lastDate, '2026-06-01');
+  assert.deepEqual(s.perTrail.map((r) => [r.id, r.done, r.pct]), [['AT', 40, 40], ['PCT', 30, 10]]);
+});
