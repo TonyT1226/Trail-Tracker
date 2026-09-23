@@ -469,7 +469,8 @@ export async function start() {
       if (confirm(t('importConfirm', incoming.length))) {
         splitByTrail(store.mergeById([...app.otherHikes, ...app.hikes], incoming));
         commit(app.hikes);
-        flash(t('importedFlash', incoming.length));
+        const elsewhere = incoming.filter((h) => h.trailId !== app.trail.id).length;
+        flash(t('importedFlash', incoming.length, elsewhere));
       }
     } catch (e) {
       flash(e.message, true);

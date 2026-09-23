@@ -81,14 +81,14 @@ def build_anchors(pois, route_path, log=print, profile=AT):
             continue
         deduped.append(a)
 
-    # termini are always present and pinned to the ends of the route
-    termini = [
-        {"name": profile.start_name, "kind": "terminus", "mile": 0.0,
-         "lat": round(coords[0][1], 5), "lon": round(coords[0][0], 5), "off": 0.0},
-        {"name": profile.end_name, "kind": "terminus", "mile": round(total, 3),
-         "lat": round(coords[-1][1], 5), "lon": round(coords[-1][0], 5), "off": 0.0},
-    ]
-    anchors = sorted(termini + [a for a in deduped if a["kind"] != "terminus"], key=lambda a: a["mile"])
+    # termini are always present and pinned to the ends of the list -- a place right next to
+    # a terminus snaps to the same mile, and must not sort in front of / after it
+    start = {"name": profile.start_name, "kind": "terminus", "mile": 0.0,
+             "lat": round(coords[0][1], 5), "lon": round(coords[0][0], 5), "off": 0.0}
+    end = {"name": profile.end_name, "kind": "terminus", "mile": round(total, 3),
+           "lat": round(coords[-1][1], 5), "lon": round(coords[-1][0], 5), "off": 0.0}
+    middle = sorted((a for a in deduped if a["kind"] != "terminus"), key=lambda a: a["mile"])
+    anchors = [start, *middle, end]
     log(f"{len(anchors)} anchors kept; dropped: {dropped}")
     return {"anchors": anchors}
 

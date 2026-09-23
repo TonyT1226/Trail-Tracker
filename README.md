@@ -1,16 +1,16 @@
 <p align="center">
-  <img src="logo.png" alt="AT Progress Tracker" width="160" />
+  <img src="logo.png" alt="Trail Tracker" width="160" />
 </p>
 
-# AT Progress Tracker
+# Trail Tracker
 
 *(中文说明见 [README.zh.md](README.zh.md))*
 
-A static site for tracking your progress on the Appalachian Trail: log the sections you've hiked, watch them fill in on the map, and see how each state is coming along. No account, no server -- everything stays in your browser.
+A static site for tracking your progress on America's long trails -- the Appalachian Trail and the Pacific Crest Trail so far: log the sections you've hiked, watch them fill in on the map, and see how each state is coming along. No account, no server -- everything stays in your browser.
 
 ## What it does
 
-- The full AT on a map, with real mileage from the official trail data.
+- The full AT or PCT on a map, with real mileage from the official trail data. Switch trails from the top of the page; each keeps its own progress.
 - Log a hike by date and a start/end point -- type a mile number or a place name.
 - Overlapping or repeated hikes are never double-counted.
 - Total miles, percent complete, days hiked, and progress broken down by state.
@@ -19,9 +19,9 @@ A static site for tracking your progress on the Appalachian Trail: log the secti
 
 ## Roadmap
 
-This is 1.0: the Appalachian Trail, done. Beyond it:
+1.0 (the Appalachian Trail) is done; 2.0 is in progress:
 
-- **2.0** -- more long trails (PCT next), and an overview across all of them.
+- **2.0** -- more long trails (the PCT is in), and an overview across all of them (next).
 - **3.0** -- import your own GPX tracks instead of typing in mile ranges by hand.
 - **4.0** -- a native iOS/iPadOS/macOS app.
 

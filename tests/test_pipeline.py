@@ -220,6 +220,18 @@ class ProfileTests(unittest.TestCase):
                 json.dump({"coords": coords, "miles": [float(m) for m in cumulative_miles(coords)]}, f)
             names = [a["name"] for a in build_anchors([], path, log=quiet, profile=PCT)["anchors"]]
         self.assertEqual(names, ["Southern Terminus", "Northern Terminus"])
+
+    def test_places_at_a_terminus_stay_inside_the_termini(self):
+        # a campground right at the northern monument snaps to the very last mile
+        with tempfile.TemporaryDirectory() as tmp:
+            coords = [list(PCT.start), list(PCT.end)]
+            path = os.path.join(tmp, "route.json")
+            with open(path, "w") as f:
+                json.dump({"coords": coords, "miles": [float(m) for m in cumulative_miles(coords)]}, f)
+            camp = {"type": "Feature", "properties": {"name": "Monument 78 Campground", "tourism": "camp_site"},
+                    "geometry": {"type": "Point", "coordinates": [PCT.end[0], PCT.end[1] + 0.0001]}}
+            names = [a["name"] for a in build_anchors([camp], path, log=quiet, profile=PCT)["anchors"]]
+        self.assertEqual(names, ["Southern Terminus", "Monument 78 Campground", "Northern Terminus"])
         self.assertEqual(state_code({"NAME": "Oregon"}, PCT.states), "OR")
         self.assertIsNone(state_code({"NAME": "Oregon"}))                      # not an AT state
 

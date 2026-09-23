@@ -42,3 +42,18 @@ test('the shipped catalog is valid and every file it names exists', async () => 
     }
   }
 });
+
+test('the shipped PCT package matches PCTA\'s official figures', async () => {
+  const catalog = await loadCatalog('data/trails/index.json', readJSON);
+  const pct = catalog.find((tr) => tr.id === 'PCT');
+  assert.ok(pct, 'PCT is listed in index.json');
+  assert.match(pct.credit.en, /Pacific Crest Trail Association.*CC BY 4\.0/);
+  const route = await readJSON(pct.urls.route);
+  assert.equal(route.totalMiles, 2655.84);
+  const states = await readJSON(pct.urls.states);
+  assert.deepEqual(states.order, ['CA', 'OR', 'WA']);
+  const { anchors } = await readJSON(pct.urls.anchors);
+  assert.deepEqual([anchors[0].name, anchors.at(-1).name], ['Southern Terminus', 'Northern Terminus']);
+  const forester = anchors.find((a) => a.name === 'Forester Pass');
+  assert.ok(Math.abs(forester.mile - 780.6) < 0.5, `Forester Pass at ${forester.mile}`);  // PCTA: ~mile 780.6
+});

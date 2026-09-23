@@ -120,3 +120,20 @@ test('deleting on this trail leaves other trails\' activities alone', () => {
   $$('#hikes li').find((r) => r.textContent.includes('2026-04-02')).querySelector('button[data-act="del"]').click();
   assert.deepEqual(saved().map((a) => a.id).sort(), ['at-1', saved().find((a) => a.trailId === 'TEST').id].sort());
 });
+
+test('importing hikes from several trails says how many landed on other trails', async () => {
+  const file = new File([JSON.stringify({   // Node's File: jsdom's has no .text()
+    schemaVersion: 1,
+    activities: [
+      { ...atHike, id: 'at-2', range: { from: 60, to: 70 } },
+      { ...testHike, id: 'tt-2', range: { from: 50, to: 60 } },
+    ],
+  })], 'backup.json', { type: 'application/json' });
+  const input = $('#importFile');
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  input.dispatchEvent(new window.Event('change'));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal($('#formMsg').textContent, 'Imported 2 hikes (1 on other trails -- switch trails to see it)');
+  assert.ok(saved().some((a) => a.id === 'at-2'), 'the AT hike is kept even though it is not shown');
+  assert.equal($$('#hikes li').length, 2);   // the remaining TEST hike + the imported one
+});

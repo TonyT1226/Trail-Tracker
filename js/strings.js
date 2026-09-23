@@ -73,7 +73,8 @@ export const STRINGS = {
     fileProtocolHint: 'Can’t open index.html by double-clicking. Double-click start.command, or run "python3 -m http.server" in the project folder and visit http://localhost:8000.',
     loadErrorPrefix: (hint) => `Couldn’t load data: ${hint}`,
     importConfirm: (n) => `Import ${n} hike${n === 1 ? '' : 's'} and merge with what’s already here? (entries with the same id are overwritten)`,
-    importedFlash: (n) => `Imported ${n} hike${n === 1 ? '' : 's'}`,
+    importedFlash: (n, elsewhere = 0) => `Imported ${n} hike${n === 1 ? '' : 's'}${
+      elsewhere ? ` (${elsewhere} on other trails -- switch trails to see ${elsewhere === 1 ? 'it' : 'them'})` : ''}`,
     mapPopupMile: (dist) => `Mile ${dist}`,
     days, hikesCount,
     langToggleAria: 'Language', unitToggleAria: 'Distance unit',
@@ -131,7 +132,7 @@ export const STRINGS = {
     fileProtocolHint: '不能直接双击打开 index.html。双击 start.command，或者在项目目录运行 python3 -m http.server，再访问 http://localhost:8000。',
     loadErrorPrefix: (hint) => `数据加载失败：${hint}`,
     importConfirm: (n) => `导入 ${n} 条记录，并与现有记录合并（相同 id 会被覆盖）？`,
-    importedFlash: (n) => `已导入 ${n} 条记录`,
+    importedFlash: (n, elsewhere = 0) => `已导入 ${n} 条记录${elsewhere ? `（其中 ${elsewhere} 条属于其他路线，切换路线后可以看到）` : ''}`,
     mapPopupMile: (dist) => `里程 ${dist}`,
     days: (n) => `${n} 天`,
     hikesCount: (n) => `${n} 段`,
