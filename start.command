@@ -13,5 +13,5 @@ if lsof -i ":$PORT" >/dev/null 2>&1; then
 fi
 
 (sleep 1 && open "$URL") &
-echo "Starting AT Tracker at $URL (Ctrl+C or close this window to stop)"
-python3 -m http.server "$PORT"
+echo "Starting Trail Tracker at $URL (Ctrl+C or close this window to stop)"
+python3 scripts/serve.py "$PORT"

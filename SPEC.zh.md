@@ -125,11 +125,13 @@ python3 scripts/build_states.py --trail PCT data/raw/cb_2023_us_state_500k.zip
 ## 开发
 
 ```bash
-python3 -m http.server 8000     # 然后访问 http://localhost:8000（不能直接双击 index.html）
+python3 scripts/serve.py        # 然后访问 http://localhost:8000（不能直接双击 index.html）
 npm install                     # 只为跑 UI 测试
 npm test                        # JS 测试
 python3 -m unittest tests/test_pipeline.py -v   # 数据流水线测试
 ```
+
+`scripts/serve.py`（`start.command` 和 `npm run serve` 用的也是它）就是 Python 自带的静态服务器，只改了一处：每个响应都带 `Cache-Control: no-cache`，这样更新项目之后，浏览器会重新确认每个文件，而不是拿缓存里的旧脚本配新的 `index.html`（没变的文件只返回一个很快的 304）。它只监听本机，因为 `js/config.js` 里可能有你的 token。直接用 `python3 -m http.server` 也能跑，但更新后可能需要强制刷新一次（⌘⇧R / Ctrl+F5）。
 
 ### 部署自己的版本
 

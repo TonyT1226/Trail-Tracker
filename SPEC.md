@@ -125,11 +125,13 @@ python3 scripts/build_states.py --trail PCT data/raw/cb_2023_us_state_500k.zip
 ## Development
 
 ```bash
-python3 -m http.server 8000     # then visit http://localhost:8000 (double-clicking index.html directly won't work)
+python3 scripts/serve.py        # then visit http://localhost:8000 (double-clicking index.html directly won't work)
 npm install                     # only needed to run the UI tests
 npm test                        # JS tests
 python3 -m unittest tests/test_pipeline.py -v   # data pipeline tests
 ```
+
+`scripts/serve.py` (also what `start.command` and `npm run serve` run) is Python's built-in static server with one change: every response says `Cache-Control: no-cache`, so after you update the project the browser re-checks each file instead of running old cached scripts against a new `index.html` (unchanged files come back as a quick 304). It listens on this computer only, since `js/config.js` may hold your token. Plain `python3 -m http.server` still works, but may need a hard refresh (⌘⇧R / Ctrl+F5) after an update.
 
 ### Deploying your own copy
 

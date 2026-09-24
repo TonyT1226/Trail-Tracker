@@ -112,7 +112,7 @@ npm test        # 其中有一项会检查每个 trail.json 里列的文件是�
 python3 -m unittest tests/test_pipeline.py -v
 ```
 
-然后启动网站（双击 `start.command`，或运行 `python3 -m http.server 8000`），在浏览器里检查：
+然后启动网站（双击 `start.command`，或运行 `python3 scripts/serve.py`），在浏览器里检查：
 
 - 切换菜单里出现了新路线，名称、副标题、总长和署名都对。
 - 地图上显示完整的路线，起点和终点位置正确。

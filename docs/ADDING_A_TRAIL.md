@@ -112,7 +112,7 @@ npm test        # includes a check that every file each trail.json names exists
 python3 -m unittest tests/test_pipeline.py -v
 ```
 
-Then start the site (`start.command`, or `python3 -m http.server 8000`) and check in the browser:
+Then start the site (`start.command`, or `python3 scripts/serve.py`) and check in the browser:
 
 - The new trail is in the picker, and its name, subtitle, total length and credit are right.
 - The whole line shows on the map, starting and ending where it should.
