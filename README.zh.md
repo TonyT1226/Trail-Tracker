@@ -6,7 +6,7 @@
 
 *(English README: [README.md](README.md))*
 
-一个记录美国长线徒步进度的静态网站，目前支持 Appalachian Trail（AT）和 Pacific Crest Trail（PCT）：记下你走过的路段，在地图上看它们变成洋红色，按州查看进度。没有账号，没有服务器，所有数据都留在你的浏览器里。
+一个记录美国长线徒步进度的静态网站，目前支持 Appalachian Trail（AT）和 Pacific Crest Trail（PCT）：记下你走过的路段，在地图上看它们变成青绿色，按州查看进度。没有账号，没有服务器，所有数据都留在你的浏览器里。
 
 ## 能做什么
 

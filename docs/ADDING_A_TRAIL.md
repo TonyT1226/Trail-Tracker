@@ -84,7 +84,7 @@ Create `data/trails/<ID>/trail.json`. The PCT's is a good template:
   "id": "CDT",
   "name": "Continental Divide Trail",
   "shortName": "CDT",
-  "color": "#2a9d4b",
+  "color": "#7b5ea7",
   "subtitle": { "en": "Crazy Cook, NM to Waterton Lake, MT", "zh": "..." },
   "credit": { "en": "Trail: .... Place names: © OpenStreetMap contributors.", "zh": "..." },
   "files": { "route": "route.json", "anchors": "anchors.json", "states": "states.json", "borders": "state_borders.geojson" }
@@ -93,7 +93,7 @@ Create `data/trails/<ID>/trail.json`. The PCT's is a good template:
 
 - `id` must match the folder name exactly.
 - `shortName` is what the picker shows, so keep it to a few letters.
-- `color` is used in the "All" overview. Pick one that's easy to tell apart from the others there (AT `#d1246b`, PCT `#1f78b4`) and readable on the map.
+- `color` is used in the "All" overview. Pick one that's easy to tell apart from the others there (AT `#2a9d99`, PCT `#d9822b`) and readable on the map.
 - `credit` is shown in the page footer. It must carry the attribution from step 1.
 - `subtitle` and `credit` can be plain strings, or `{ "en": ..., "zh": ... }` for a translation.
 - Only `files.route` is required. Leave out any file you didn't build.

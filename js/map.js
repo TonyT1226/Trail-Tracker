@@ -4,7 +4,8 @@
 
 const EMPTY = { type: 'FeatureCollection', features: [] };
 const FONT = ['DIN Pro Medium', 'Arial Unicode MS Regular'];
-const COLORS = { base: '#4f5d58', done: '#d1246b', halo: '#ffb703', casing: '#ffffff' };
+// done: the logo's teal, a shade deeper so it reads on the light basemap and apart from water
+const COLORS = { base: '#4f5d58', done: '#2a9d99', halo: '#ffb703', casing: '#ffffff' };
 
 const widthByZoom = (small, large) => ['interpolate', ['linear'], ['zoom'], 4, small, 11, large];
 

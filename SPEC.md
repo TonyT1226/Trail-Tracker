@@ -9,7 +9,7 @@ How the code is laid out, how data flows through it, and where the trail data co
 ```
 index.html            page shell
 start.command         double-click to start a local server and open the browser
-css/style.css         styling (pine-green panel + white blazes + magenta completed line)
+css/style.css         styling (pine-green panel + white blazes + teal completed line)
 js/
   config.js           settings you may want to change: Mapbox token, state grouping, data paths
   trails.js            loads the trail catalog (data/trails/index.json) and each trail's manifest
@@ -44,7 +44,7 @@ Every trail is a folder under `data/trails/` with a `trail.json` manifest; `data
   "id": "AT",                       // must match the folder name; stored on every activity as trailId
   "name": "Appalachian Trail",
   "shortName": "AT",                // shown in the picker
-  "color": "#d1246b",
+  "color": "#2a9d99",
   "subtitle": { "en": "...", "zh": "..." },   // a plain string also works
   "credit":   { "en": "...", "zh": "..." },   // data attribution shown in the footer
   "files": { "route": "route.json", "anchors": "anchors.json", "states": "states.json", "borders": "state_borders.geojson" }

@@ -9,7 +9,7 @@
 ```
 index.html            页面骨架
 start.command         双击启动本地服务器并打开浏览器
-css/style.css         样式（松绿面板 + 白色路标 + 洋红完成线）
+css/style.css         样式（松绿面板 + 白色路标 + 青绿完成线）
 js/
   config.js           你要改的设置：Mapbox token、州合并规则、数据路径
   trails.js            读取路线目录（data/trails/index.json）和每条路线的说明文件
@@ -44,7 +44,7 @@ tests/                JS 与 Python 测试
   "id": "AT",                       // 必须和文件夹同名；每条记录用 trailId 引用它
   "name": "Appalachian Trail",
   "shortName": "AT",                // 显示在切换菜单里
-  "color": "#d1246b",
+  "color": "#2a9d99",
   "subtitle": { "en": "...", "zh": "..." },   // 也可以直接写一个字符串
   "credit":   { "en": "...", "zh": "..." },   // 页脚显示的数据署名
   "files": { "route": "route.json", "anchors": "anchors.json", "states": "states.json", "borders": "state_borders.geojson" }

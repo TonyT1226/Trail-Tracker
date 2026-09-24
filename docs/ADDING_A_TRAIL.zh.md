@@ -84,7 +84,7 @@ python3 scripts/build_states.py --trail CDT data/raw/cb_2023_us_state_500k.zip
   "id": "CDT",
   "name": "Continental Divide Trail",
   "shortName": "CDT",
-  "color": "#2a9d4b",
+  "color": "#7b5ea7",
   "subtitle": { "en": "Crazy Cook, NM to Waterton Lake, MT", "zh": "..." },
   "credit": { "en": "Trail: .... Place names: © OpenStreetMap contributors.", "zh": "..." },
   "files": { "route": "route.json", "anchors": "anchors.json", "states": "states.json", "borders": "state_borders.geojson" }
@@ -93,7 +93,7 @@ python3 scripts/build_states.py --trail CDT data/raw/cb_2023_us_state_500k.zip
 
 - `id` 必须和文件夹名完全一致。
 - `shortName` 显示在切换菜单里，几个字母就好。
-- `color` 用在“全部”总览里。选一个和已有路线容易区分（AT `#d1246b`，PCT `#1f78b4`）、在地图上也看得清的颜色。
+- `color` 用在“全部”总览里。选一个和已有路线容易区分（AT `#2a9d99`，PCT `#d9822b`）、在地图上也看得清的颜色。
 - `credit` 显示在页面底部，必须包含第 1 步要求的署名。
 - `subtitle` 和 `credit` 可以直接写字符串，也可以写成 `{ "en": ..., "zh": ... }` 提供翻译。
 - 只有 `files.route` 是必须的，没生成的文件就不要列。

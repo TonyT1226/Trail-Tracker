@@ -133,7 +133,7 @@ test('no hike form or log without a trail, just a pointer to the picker', () => 
 test('the map draws every route and colours walked miles per trail', () => {
   assert.equal(sources.routes.data.features.length, 2);
   const done = sources.done.data.features;
-  assert.deepEqual(done.map((f) => f.properties.color), ['#d1246b', '#0077aa']);
+  assert.deepEqual(done.map((f) => f.properties.color), ['#2a9d99', '#0077aa']);
   assert.deepEqual(layers.find((l) => l.id === 'done').paint['line-color'], ['get', 'color']);
 });
 

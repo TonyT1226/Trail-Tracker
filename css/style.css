@@ -1,6 +1,6 @@
 /* Look: a pine-green field panel beside the map. The hero is a row of 100 white blazes
    (the 2x6 inch paint marks that mark the real trail), one per percent walked.
-   Completed trail on the map and in the bars is topo-map revision magenta. */
+   Completed trail on the map and in the bars is the teal of the path in the logo. */
 
 :root {
   --pine: #1f3b35;
@@ -8,7 +8,9 @@
   --pine-line: rgba(246, 247, 242, 0.16);
   --blaze: #f6f7f2;
   --moss: #a9c1b0;
-  --magenta: #d1246b;
+  --teal: #40aaa8;        /* the logo's path; progress bars and the main button */
+  --teal-hover: #4fbcb9;
+  --alert: #d1246b;       /* errors only */
   --amber: #ffb703;
   --ink: #1b2a26;
   --font-body: "Barlow", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
@@ -117,7 +119,7 @@ h2 {
   border: 1px solid rgba(255, 183, 3, 0.5);
   border-radius: 6px;
 }
-.banner.error { background: rgba(209, 36, 107, 0.2); border-color: rgba(209, 36, 107, 0.7); }
+.banner.error { background: rgba(209, 36, 107, 0.2); border-color: var(--alert); }
 
 /* ---------------------------------------------------------------- progress */
 
@@ -158,7 +160,7 @@ h2 {
 .state-num { color: var(--moss); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .state-done-badge { margin-left: 6px; color: var(--moss); font-size: 12px; }
 .track { height: 5px; margin-top: 5px; overflow: hidden; background: rgba(246, 247, 242, 0.14); border-radius: 3px; }
-.fill { display: block; height: 100%; background: var(--magenta); border-radius: 3px; }
+.fill { display: block; height: 100%; background: var(--teal); border-radius: 3px; }
 
 /* ---------------------------------------------------------------- form */
 
@@ -188,12 +190,12 @@ button:focus-visible, input:focus-visible, .btn:focus-within {
 .primary {
   padding: 10px 18px;
   font-weight: 600;
-  color: #fff;
-  background: var(--magenta);
+  color: var(--ink);
+  background: var(--teal);
   border: 0;
   border-radius: 6px;
 }
-.primary:hover { background: #e02a78; }
+.primary:hover { background: var(--teal-hover); }
 
 .ghost, .pick {
   padding: 8px 12px;
