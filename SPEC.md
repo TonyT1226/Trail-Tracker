@@ -34,6 +34,8 @@ tests/                JS and Python tests
 
 ## Trail packages
 
+Step-by-step instructions for contributing a new trail, including how to check its data license, are in [docs/ADDING_A_TRAIL.md](docs/ADDING_A_TRAIL.md).
+
 Every trail is a folder under `data/trails/` with a `trail.json` manifest; `data/trails/index.json` lists the folders to load. Adding a trail is a data-only change -- build its files, write its `trail.json`, add its id to `index.json`; no page code changes. With more than one trail listed, a picker appears next to the language/unit switches; the choice is remembered in this browser.
 
 ```jsonc

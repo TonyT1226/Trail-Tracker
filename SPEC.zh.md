@@ -34,6 +34,8 @@ tests/                JS 与 Python 测试
 
 ## 路线数据包
 
+添加一条新路线的完整步骤（包括怎么核查数据许可）见 [docs/ADDING_A_TRAIL.zh.md](docs/ADDING_A_TRAIL.zh.md)。
+
 每条路线是 `data/trails/` 下的一个文件夹，里面有一份 `trail.json` 说明文件；`data/trails/index.json` 列出要加载哪些文件夹。新增一条路线只改数据：生成它的数据文件、写好 `trail.json`、把 id 加进 `index.json`，不需要改页面代码。列出的路线超过一条时，语言/单位切换旁边会出现路线切换菜单，选择会记在这个浏览器里。
 
 ```jsonc

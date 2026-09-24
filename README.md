@@ -22,7 +22,7 @@ A static site for tracking your progress on America's long trails -- the Appalac
 
 1.0 (the Appalachian Trail) is done; 2.0 is in progress:
 
-- **2.0** -- more long trails (the PCT is in), and an overview across all of them (done); next, a guide to adding a trail.
+- **2.0** -- more long trails (the PCT is in), and an overview across all of them. Want another trail? See [Adding a trail](docs/ADDING_A_TRAIL.md).
 - **3.0** -- import your own GPX tracks instead of typing in mile ranges by hand.
 - **4.0** -- a native iOS/iPadOS/macOS app.
 
