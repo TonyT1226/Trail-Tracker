@@ -74,4 +74,5 @@ test('a data loading failure is reported instead of a blank page', async () => {
   await start();
   assert.equal($('#loadError').hidden, false);
   assert.match($('#loadError').textContent, /Couldn.t load data/);
+  assert.equal(document.querySelector('.app').classList.contains('booting'), false, 'the error is visible, not hidden with the panel');
 });

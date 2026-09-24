@@ -28,6 +28,14 @@ body {
 
 /* ---------------------------------------------------------------- layout */
 
+/* Until app.js has loaded the trail and filled the panel in, keep the placeholder markup
+   (zeroes, empty form) out of sight -- otherwise every trail/language switch, which reloads
+   the page, flashes it for a moment. */
+.app.booting .panel > * { visibility: hidden; }
+.app:not(.booting) .panel > * { animation: panel-in 160ms ease-out; }   /* starts when revealed */
+@keyframes panel-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .app:not(.booting) .panel > * { animation: none; } }
+
 .app {
   display: grid;
   height: 100vh;

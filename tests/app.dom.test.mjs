@@ -36,6 +36,7 @@ class FakeMap {
   addSource(id, spec) { sources[id] = { spec, data: spec.data, setData(d) { this.data = d; } }; }
   addLayer() {}
   getSource(id) { return sources[id]; }
+  getStyle() { return { imports: [] }; }
   getCanvas() { return { style: {} }; }
   getZoom() { return 6; }
   fitBounds(b) { calls.push(['fitBounds', b]); }
@@ -93,6 +94,7 @@ test('initial render from real route data, in English by default', () => {
   assert.equal($('#emptyMsg').hidden, false);
   assert.equal($('#doneMi').textContent, '0.0');
   assert.ok(sources.route && sources.done && sources.focus, 'map sources were added on load');
+  assert.ok(sources.contours && sources.dem, 'topo sources (contours + hillshade) were added on load');
 });
 
 test('logging a hike by place names', () => {

@@ -447,9 +447,9 @@ function splitByTrail(activities) {
 
 function renderTrailHeader() {
   const lang = getLang();
-  const name = app.trail?.name ?? t('allTrails');
+  const name = app.trail?.name ?? t('title');
   const shown = app.trail ? [app.trail] : app.catalog;
-  document.title = `${name} · ${t('title')}`;
+  document.title = app.trail ? `${name} · ${t('title')}` : t('title');
   $('#trailName').textContent = name;
   $('#trailSubtitle').textContent = app.trail
     ? localized(app.trail.subtitle, lang)
@@ -523,6 +523,7 @@ export async function start() {
     const hint = location.protocol === 'file:' ? t('fileProtocolHint') : e.message;
     $('#loadError').textContent = t('loadErrorPrefix', hint);
     $('#loadError').hidden = false;
+    $('.app').classList.remove('booting');
     return;
   }
 
@@ -570,6 +571,8 @@ export async function start() {
       mapboxgl,
       token,
       style: CONFIG.mapStyle,
+      styleConfig: CONFIG.mapStyleConfig,
+      contours: CONFIG.contours,
       trails: app.overview.map(({ trail, route }) => ({ id: trail.id, name: trail.name, color: trail.color, route })),
       container: 'map',
       unit: getUnit(),
@@ -587,6 +590,8 @@ export async function start() {
       mapboxgl,
       token,
       style: CONFIG.mapStyle,
+      styleConfig: CONFIG.mapStyleConfig,
+      contours: CONFIG.contours,
       route: app.route,
       anchors: app.anchors,
       bordersUrl: app.trail.urls.borders,
@@ -612,6 +617,7 @@ export async function start() {
   }
 
   render();
+  $('.app').classList.remove('booting');
 }
 
 if (!globalThis.__AT_TEST__) start();

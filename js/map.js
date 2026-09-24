@@ -16,10 +16,62 @@ const line = (id, source, color, width, extra = {}) => ({
   paint: { 'line-color': color, 'line-width': width, ...extra },
 });
 
-// Shared by both views: the map itself, its controls, and error reporting.
-function baseMap({ mapboxgl, token, style, container, bounds, unit, onError }) {
+// Topo layers: soft hillshade plus contour lines from Mapbox's terrain tilesets, drawn under
+// roads and labels, with contours labelled in feet or metres to match the unit switch. Every
+// 5th/10th line (the "index" contours) is darker and carries the labels, as on a paper topo map.
+const CONTOUR = '#7d6b4a';
+const DEM = { type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14 };
+function addContours(map, unit) {
+  const standard = Boolean(map.getStyle().imports?.length);
+  const slot = standard ? { slot: 'bottom' } : {};        // Standard style: under roads and labels
+  const labelSlot = standard ? { slot: 'middle' } : {};
+  if (!map.getSource('dem')) map.addSource('dem', DEM);    // shared with the 3D terrain toggle
+  map.addLayer({
+    id: 'hillshade', type: 'hillshade', source: 'dem',
+    paint: {
+      'hillshade-exaggeration': 0.35,
+      'hillshade-shadow-color': 'rgba(60, 55, 40, 0.5)',
+      'hillshade-highlight-color': 'rgba(255, 255, 255, 0.25)',
+      'hillshade-accent-color': 'rgba(60, 55, 40, 0.3)',
+    },
+    ...slot,
+  });
+  const major = ['in', ['get', 'index'], ['literal', [5, 10]]];
+  const ele = unit === 'km'
+    ? ['concat', ['to-string', ['get', 'ele']], ' m']
+    : ['concat', ['to-string', ['round', ['*', ['get', 'ele'], 3.28084]]], ' ft'];
+  map.addSource('contours', { type: 'vector', url: 'mapbox://mapbox.mapbox-terrain-v2' });
+  map.addLayer({
+    id: 'contour-minor', type: 'line', source: 'contours', 'source-layer': 'contour', minzoom: 11,
+    filter: ['!', major],
+    paint: { 'line-color': CONTOUR, 'line-width': 0.6, 'line-opacity': 0.45 },
+    ...slot,
+  });
+  map.addLayer({
+    id: 'contour-major', type: 'line', source: 'contours', 'source-layer': 'contour', minzoom: 9,
+    filter: major,
+    paint: { 'line-color': CONTOUR, 'line-width': ['interpolate', ['linear'], ['zoom'], 9, 0.6, 14, 1.2], 'line-opacity': 0.65 },
+    ...slot,
+  });
+  map.addLayer({
+    id: 'contour-labels', type: 'symbol', source: 'contours', 'source-layer': 'contour', minzoom: 12,
+    filter: major,
+    layout: {
+      'symbol-placement': 'line', 'text-field': ele, 'text-font': FONT, 'text-size': 10,
+      'text-max-angle': 25, 'text-padding': 20,
+    },
+    paint: { 'text-color': CONTOUR, 'text-halo-color': 'rgba(255,255,255,0.85)', 'text-halo-width': 1.2 },
+    ...labelSlot,
+  });
+}
+
+// Shared by both views: the map itself, its controls, contours, and error reporting.
+function baseMap({ mapboxgl, token, style, styleConfig, contours, container, bounds, unit, onError }) {
   mapboxgl.accessToken = token;
-  const map = new mapboxgl.Map({ container, style, bounds, fitBoundsOptions: { padding: 40 } });
+  const map = new mapboxgl.Map({
+    container, style, bounds, fitBoundsOptions: { padding: 40 }, ...(styleConfig ? { config: styleConfig } : {}),
+  });
+  if (contours) map.on('load', () => addContours(map, unit));
   map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
   map.addControl(new mapboxgl.ScaleControl({ unit: unit === 'km' ? 'metric' : 'imperial' }), 'bottom-left');
   map.on('error', (e) => onError?.(e.error || e));
@@ -32,9 +84,7 @@ function terrainToggle(map) {
   return () => {
     on = !on;
     if (on) {
-      if (!map.getSource('dem')) {
-        map.addSource('dem', { type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14 });
-      }
+      if (!map.getSource('dem')) map.addSource('dem', DEM);
       map.setTerrain({ source: 'dem', exaggeration: 1.4 });
       map.easeTo({ pitch: 60, duration: 800 });
     } else {
@@ -51,8 +101,8 @@ function clickLimitMi(map, lat) {
   return Math.max(0.3, (mPerPx * 24) / 1609.344);
 }
 
-export function createMapView({ mapboxgl, token, style, route, anchors, bordersUrl, container, onPick, onError, unit = 'mi', formatMile }) {
-  const map = baseMap({ mapboxgl, token, style, container, bounds: route.bounds(), unit, onError });
+export function createMapView({ mapboxgl, token, style, styleConfig, contours, route, anchors, bordersUrl, container, onPick, onError, unit = 'mi', formatMile }) {
+  const map = baseMap({ mapboxgl, token, style, styleConfig, contours, container, bounds: route.bounds(), unit, onError });
 
   let ready = false;
   let pendingDone = EMPTY;
@@ -188,13 +238,13 @@ export function createMapView({ mapboxgl, token, style, route, anchors, bordersU
 // Every trail at once: each route as a grey line, with its walked miles drawn over it in
 // that trail's own colour. trails: [{ id, name, color, route }]; setDone takes
 // { [id]: mergedIntervals }.
-export function createOverviewMap({ mapboxgl, token, style, trails, container, onError, unit = 'mi', formatPoint }) {
+export function createOverviewMap({ mapboxgl, token, style, styleConfig, contours, trails, container, onError, unit = 'mi', formatPoint }) {
   const all = trails.flatMap((tr) => tr.route.bounds());
   const bounds = [
     [Math.min(...all.map((p) => p[0])), Math.min(...all.map((p) => p[1]))],
     [Math.max(...all.map((p) => p[0])), Math.max(...all.map((p) => p[1]))],
   ];
-  const map = baseMap({ mapboxgl, token, style, container, bounds, unit, onError });
+  const map = baseMap({ mapboxgl, token, style, styleConfig, contours, container, bounds, unit, onError });
 
   let ready = false;
   let pendingDone = EMPTY;

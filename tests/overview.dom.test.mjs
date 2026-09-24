@@ -33,6 +33,7 @@ class FakeMap {
   addSource(id, spec) { sources[id] = { data: spec.data, setData(d) { this.data = d; } }; }
   addLayer(spec) { layers.push(spec); }
   getSource(id) { return sources[id]; }
+  getStyle() { return { imports: [] }; }
   getZoom() { return 6; }
   fitBounds(b) { fits.push(b); }
 }
@@ -91,9 +92,10 @@ const AT_TOTAL = 2197.9;
 test('the picker is on "All" and the header describes every trail', () => {
   assert.equal($('#loadError').hidden, true, $('#loadError').textContent);
   assert.equal($('#trailSelect').value, '*');
-  assert.equal($('#trailName').textContent, 'All trails');
+  assert.equal($('#trailName').textContent, 'Trail Tracker');
   assert.equal($('#trailSubtitle').textContent, 'Progress on all 2 trails');
-  assert.equal(document.title, 'All trails · Trail Tracker');
+  assert.equal(document.title, 'Trail Tracker');
+  assert.equal($('.app').classList.contains('booting'), false, 'panel revealed once filled in');
   assert.match($('#credit').textContent, /Appalachian Trail Conservancy.*Test data, public domain\./);
 });
 

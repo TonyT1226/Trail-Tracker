@@ -5,8 +5,21 @@ export const CONFIG = {
   // real token here: this file is checked into the repo.
   mapboxToken: '',
 
-  // Outdoors has contour lines, hillshade, trails and state names built in.
-  mapStyle: 'mapbox://styles/mapbox/outdoors-v12',
+  // Mapbox Standard with its muted "faded" theme, so the trail lines stand out. mapStyleConfig
+  // only applies to Standard; set it to null if you switch to another style (e.g. the more
+  // colourful 'mapbox://styles/mapbox/outdoors-v12').
+  mapStyle: 'mapbox://styles/mapbox/standard',
+  mapStyleConfig: {
+    basemap: {
+      theme: 'faded',
+      lightPreset: 'day',
+      show3dObjects: false,
+      showPointOfInterestLabels: false,
+      showTransitLabels: false,
+    },
+  },
+  // Topo-style contour lines (from Mapbox's terrain tiles), labelled in ft or m.
+  contours: true,
 
   // States to count together in the per-state progress list, e.g. [['NC', 'TN']].
   // Applies to whichever trail is open; every state is shown separately by default.
